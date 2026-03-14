@@ -12,7 +12,7 @@ import {
   CalendarDays,
   TrendingUp,
   FileBarChart2,
-  AlertTriangle,
+  Bell,
   PackageSearch,
   Locate,
   Clock,
@@ -22,6 +22,8 @@ import {
   X,
   ChevronRight,
   Shield,
+  Navigation,
+  Coffee,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
@@ -62,7 +64,14 @@ const allMenuItems = [
     label: "Leave Management",
     href: "/admin/leave",
     description: "Leaves & Holidays",
-    roles: ["admin", "hr"],
+    roles: ["admin", "hr", "manager"],
+  },
+  {
+    icon: Navigation,
+    label: "Visits",
+    href: "/admin/visits",
+    description: "Showroom Visit Records",
+    roles: ["admin", "hr", "manager"],
   },
   {
     icon: TrendingUp,
@@ -79,18 +88,18 @@ const allMenuItems = [
     roles: ["admin", "hr", "manager"],
   },
   {
-    icon: AlertTriangle,
-    label: "Anomalies",
+    icon: Bell,
+    label: "Alerts",
     href: "/admin/anomalies",
-    description: "Smart Detection Alerts",
-    roles: ["admin", "hr"],
+    description: "Employee Activity Alerts",
+    roles: ["admin", "hr", "manager"],
   },
   {
     icon: PackageSearch,
     label: "Stock Intelligence",
     href: "/admin/stock-intelligence",
     description: "Sales & Stock Insights",
-    roles: ["admin", "hr"],
+    roles: ["admin", "hr", "manager"],
   },
   {
     icon: Locate,
@@ -98,6 +107,13 @@ const allMenuItems = [
     href: "/admin/geo-fencing",
     description: "Home Location & Zones",
     roles: ["admin", "hr"],
+  },
+  {
+    icon: Coffee,
+    label: "Break Monitor",
+    href: "/admin/break-monitor",
+    description: "Employee Break Tracking",
+    roles: ["admin", "hr", "manager"],
   },
   {
     icon: Clock,

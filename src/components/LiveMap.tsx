@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -50,6 +50,7 @@ interface LiveMapProps {
   center?: [number, number];
   zoom?: number;
   markers?: MarkerData[];
+  route?: [number, number][];
   height?: string;
 }
 
@@ -57,6 +58,7 @@ export default function LiveMap({
   center = [19.076, 72.8777],
   zoom = 12,
   markers = [],
+  route = [],
   height = "100%",
 }: LiveMapProps) {
   return (
@@ -83,6 +85,10 @@ export default function LiveMap({
           </Popup>
         </Marker>
       ))}
+
+      {route.length > 1 && (
+        <Polyline positions={route} color="#f97316" weight={4} dashArray="8, 8" opacity={0.7} />
+      )}
     </MapContainer>
   );
 }

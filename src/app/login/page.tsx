@@ -1,52 +1,67 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import { RootState } from "@/store";
 import { setUser, setAuthToken } from "@/store/authSlice";
+import { loginUser } from "@/lib/api";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2, MapPin, Shield } from "lucide-react";
 
-const MOCK_USERS = [
-  { email: "admin@eashwa.in", password: "admin123", name: "Rajesh Kumar", role: "admin" as const, id: "1" },
-  { email: "hr@eashwa.in", password: "hr123", name: "Priya Sharma", role: "hr" as const, id: "2" },
-  { email: "manager@eashwa.in", password: "manager123", name: "Vikram Singh", role: "manager" as const, id: "3" },
+const DEMO_CREDENTIALS = [
+  { label: "admin", userName: "admin@eashwa.in", password: "admin123" },
+  { label: "hr", userName: "hr@eashwa.in", password: "hr123" },
+  { label: "manager", userName: "manager@eashwa.in", password: "manager123" },
 ];
 
 export default function LoginPage() {
   const router = useRouter();
   const dispatch = useDispatch();
-  const [email, setEmail] = useState("");
+  const { isAuthenticated, authToken } = useSelector(
+    (state: RootState) => state.auth
+  );
+  const [userName, setUserName] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Redirect already-authenticated users away from login
+  useEffect(() => {
+    // ReduxProvider's PersistGate already waited for rehydration
+    if (isAuthenticated && authToken) {
+      router.replace("/admin/dashboard");
+    }
+  }, [isAuthenticated, authToken, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    await new Promise((r) => setTimeout(r, 800));
+    try {
+      const data = await loginUser(userName, password);
 
-    const found = MOCK_USERS.find(
-      (u) => u.email === email && u.password === password
-    );
-
-    if (found) {
-      dispatch(setUser({ id: found.id, name: found.name, email: found.email, role: found.role }));
-      dispatch(setAuthToken("mock-token-" + found.id));
-      toast.success(`Welcome back, ${found.name}!`);
+      dispatch(
+        setUser({
+          id: data.user.id,
+          name: data.user.name,
+          email: data.user.email,
+          role: data.user.role,
+        })
+      );
+      dispatch(setAuthToken(data.token));
+      toast.success(`Welcome back, ${data.user.name}!`);
       router.push("/admin/dashboard");
-    } else {
-      toast.error("Invalid email or password");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Invalid credentials");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
-  const fillDemo = (role: "admin" | "hr" | "manager") => {
-    const u = MOCK_USERS.find((u) => u.role === role)!;
-    setEmail(u.email);
-    setPassword(u.password);
+  const fillDemo = (cred: { userName: string; password: string }) => {
+    setUserName(cred.userName);
+    setPassword(cred.password);
   };
 
   return (
@@ -77,17 +92,17 @@ export default function LoginPage() {
           <h2 className="text-xl font-bold text-gray-800 mb-6">Sign in to your account</h2>
 
           <form onSubmit={handleLogin} className="space-y-5">
-            {/* Email */}
+            {/* Email or Employee ID */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Email Address
+                Email or Employee ID
               </label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
                 required
-                placeholder="Enter your email"
+                placeholder="Enter your email or Employee ID"
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none transition-all text-sm bg-gray-50 focus:bg-white"
               />
             </div>
@@ -139,13 +154,13 @@ export default function LoginPage() {
               <Shield className="h-3 w-3" /> Demo credentials
             </p>
             <div className="grid grid-cols-3 gap-2">
-              {(["admin", "hr", "manager"] as const).map((role) => (
+              {DEMO_CREDENTIALS.map((cred) => (
                 <button
-                  key={role}
-                  onClick={() => fillDemo(role)}
+                  key={cred.label}
+                  onClick={() => fillDemo(cred)}
                   className="text-xs py-2 px-3 rounded-lg border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors capitalize font-semibold"
                 >
-                  {role}
+                  {cred.label}
                 </button>
               ))}
             </div>

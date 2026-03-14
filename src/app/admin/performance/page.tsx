@@ -1,33 +1,27 @@
 "use client";
 
-import { useState } from "react";
-import { Trophy, TrendingUp, Download, Medal } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Trophy, Download, Medal, Loader2 } from "lucide-react";
 import {
   RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store";
+import { getPerformance } from "@/lib/api";
+import { toast } from "sonner";
 
-const performanceData = [
-  { rank: 1, name: "Amit Verma", dept: "Sales", score: 92, attendance: 95, punctuality: 88, visits: 90, productive: 85, distance: 80, tasks: 96, breaks: 92, stock: 88 },
-  { rank: 2, name: "Sonal Patel", dept: "Technical", score: 89, attendance: 92, punctuality: 85, visits: 86, productive: 90, distance: 88, tasks: 90, breaks: 85, stock: 82 },
-  { rank: 3, name: "Rahul Mishra", dept: "Support", score: 86, attendance: 88, punctuality: 80, visits: 85, productive: 88, distance: 84, tasks: 87, breaks: 80, stock: 85 },
-  { rank: 4, name: "Kavita Nair", dept: "Sales", score: 84, attendance: 90, punctuality: 82, visits: 80, productive: 82, distance: 78, tasks: 84, breaks: 86, stock: 80 },
-  { rank: 5, name: "Deepak Joshi", dept: "Technical", score: 81, attendance: 85, punctuality: 78, visits: 82, productive: 80, distance: 76, tasks: 81, breaks: 82, stock: 78 },
-  { rank: 6, name: "Riya Gupta", dept: "Support", score: 71, attendance: 75, punctuality: 70, visits: 72, productive: 70, distance: 65, tasks: 71, breaks: 72, stock: 70 },
-  { rank: 7, name: "Mohan Lal", dept: "Sales", score: 65, attendance: 70, punctuality: 62, visits: 65, productive: 60, distance: 60, tasks: 66, breaks: 68, stock: 62 },
-  { rank: 8, name: "Suresh Kumar", dept: "Technical", score: 58, attendance: 62, punctuality: 55, visits: 60, productive: 55, distance: 52, tasks: 58, breaks: 60, stock: 56 },
-];
-
-const radarMetrics = (emp: typeof performanceData[0]) => [
-  { subject: "Attendance", A: emp.attendance },
-  { subject: "Punctuality", A: emp.punctuality },
-  { subject: "Visits", A: emp.visits },
-  { subject: "Productive", A: emp.productive },
-  { subject: "Distance", A: emp.distance },
-  { subject: "Tasks", A: emp.tasks },
-  { subject: "Breaks", A: emp.breaks },
-  { subject: "Stock", A: emp.stock },
-];
+export interface PerformanceRecord {
+  _id: string;
+  user?: {
+    _id: string;
+    name: string;
+    employeeId: string;
+    department: string;
+  };
+  score: number;
+  period: string;
+  metrics?: any;
+}
 
 const scoreColor = (score: number) =>
   score >= 85 ? "text-green-600" : score >= 70 ? "text-orange-500" : "text-red-500";
@@ -40,8 +34,38 @@ const rankIcon = (rank: number) => {
 };
 
 export default function PerformancePage() {
-  const [period, setPeriod] = useState("month");
-  const [selected, setSelected] = useState(performanceData[0]);
+  const [period, setPeriod] = useState("daily");
+  const [records, setRecords] = useState<PerformanceRecord[]>([]);
+  const [selected, setSelected] = useState<PerformanceRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+  const token = useSelector((state: RootState) => state.auth.authToken);
+
+  useEffect(() => {
+    const fetchPerformance = async () => {
+      if (!token) return;
+      try {
+        setLoading(true);
+        // Current spec says GET /api/performance takes ?period=daily/weekly/monthly
+        // It's not in api.ts yet so we fetch all and filter client side if needed, or pass it
+        // We will just invoke it and assume backend returns for the period or all periods
+        const res = await getPerformance(token);
+        const data = res.data || [];
+        
+        // Filter by period
+        const periodFiltered = data.filter((r: any) => r.period === period);
+        const sorted = periodFiltered.sort((a: any, b: any) => b.score - a.score);
+        
+        setRecords(sorted);
+        if (sorted.length > 0) setSelected(sorted[0]);
+        else setSelected(null);
+      } catch (err) {
+        toast.error("Failed to load performance metrics");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPerformance();
+  }, [token, period]);
 
   return (
     <div className="p-6 space-y-5">
@@ -52,7 +76,7 @@ export default function PerformancePage() {
           <p className="text-sm text-gray-500">Scoring leaderboard and detailed breakdown (0–100)</p>
         </div>
         <div className="flex gap-2">
-          {["today", "week", "month"].map(p => (
+          {["daily", "weekly", "monthly"].map(p => (
             <button
               key={p}
               onClick={() => setPeriod(p)}
@@ -78,90 +102,98 @@ export default function PerformancePage() {
               <Download className="h-3.5 w-3.5" /> Export
             </button>
           </div>
-          <div className="divide-y divide-gray-50">
-            {performanceData.map((emp) => (
-              <button
-                key={emp.rank}
-                onClick={() => setSelected(emp)}
-                className={`w-full flex items-center gap-4 px-5 py-3.5 hover:bg-orange-50/40 transition-colors text-left ${
-                  selected.rank === emp.rank ? "bg-orange-50/60" : ""
-                }`}
-              >
-                <div className="w-8 flex items-center justify-center flex-shrink-0">
-                  {rankIcon(emp.rank)}
-                </div>
-                <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-600 font-bold text-sm flex items-center justify-center flex-shrink-0">
-                  {emp.name.split(" ").map(n => n[0]).join("")}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm text-gray-800 truncate">{emp.name}</p>
-                  <p className="text-xs text-gray-400">{emp.dept}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-24 bg-gray-100 rounded-full h-2 hidden sm:block">
-                    <div className={`h-2 rounded-full ${emp.score >= 85 ? "bg-green-500" : emp.score >= 70 ? "bg-orange-500" : "bg-red-400"}`} style={{ width: `${emp.score}%` }} />
-                  </div>
-                  <span className={`text-lg font-black w-10 text-right ${scoreColor(emp.score)}`}>{emp.score}</span>
-                </div>
-              </button>
-            ))}
+          <div className="divide-y divide-gray-50 h-[400px] overflow-y-auto">
+            {loading ? (
+              <div className="p-10 flex flex-col items-center justify-center text-gray-400">
+                <Loader2 className="h-8 w-8 animate-spin text-orange-400 mb-3" />
+                <p>Loading leaderboard...</p>
+              </div>
+            ) : records.length === 0 ? (
+              <div className="p-10 text-center text-gray-500">
+                <p>No performance records found for this period.</p>
+              </div>
+            ) : (
+              records.map((emp, idx) => {
+                const rank = idx + 1;
+                const uName = emp.user?.name || "Unknown";
+                const dept = "Sales";
+
+                return (
+                  <button
+                    key={emp._id}
+                    onClick={() => setSelected(emp)}
+                    className={`w-full flex items-center gap-4 px-5 py-3.5 hover:bg-orange-50/40 transition-colors text-left ${
+                      selected?._id === emp._id ? "bg-orange-50/60" : ""
+                    }`}
+                  >
+                    <div className="w-8 flex items-center justify-center flex-shrink-0">
+                      {rankIcon(rank)}
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-600 font-bold text-sm flex items-center justify-center flex-shrink-0 uppercase">
+                      {uName.slice(0, 2)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm text-gray-800 truncate">{uName}</p>
+                      <p className="text-xs text-gray-400">{dept}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-24 bg-gray-100 rounded-full h-2 hidden sm:block">
+                        <div className={`h-2 rounded-full ${emp.score >= 85 ? "bg-green-500" : emp.score >= 70 ? "bg-orange-500" : "bg-red-400"}`} style={{ width: `${emp.score}%` }} />
+                      </div>
+                      <span className={`text-lg font-black w-10 text-right ${scoreColor(emp.score)}`}>{emp.score}</span>
+                    </div>
+                  </button>
+                );
+              })
+            )}
           </div>
         </div>
 
         {/* Detail breakdown */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
-          <div className="px-4 py-4 border-b border-gray-100">
-            <div className="flex items-center justify-between">
-              <p className="font-bold text-gray-800 text-sm">{selected.name}</p>
-              <span className={`text-2xl font-black ${scoreColor(selected.score)}`}>{selected.score}</span>
-            </div>
-            <p className="text-xs text-gray-400 mt-0.5">{selected.dept} · Rank #{selected.rank}</p>
-          </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <RadarChart data={radarMetrics(selected)} margin={{ top: 20, right: 30, bottom: 10, left: 30 }}>
-              <PolarGrid stroke="#f3f4f6" />
-              <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10 }} />
-              <Radar dataKey="A" stroke="#f97316" fill="#f97316" fillOpacity={0.2} strokeWidth={2} />
-            </RadarChart>
-          </ResponsiveContainer>
-          <div className="px-4 pb-4 grid grid-cols-2 gap-2">
-            {[
-              { label: "Attendance", value: selected.attendance },
-              { label: "Punctuality", value: selected.punctuality },
-              { label: "Visits", value: selected.visits },
-              { label: "Productive", value: selected.productive },
-              { label: "Tasks", value: selected.tasks },
-              { label: "Stock", value: selected.stock },
-            ].map(m => (
-              <div key={m.label} className="flex items-center justify-between text-xs py-1 border-b border-gray-50">
-                <span className="text-gray-500">{m.label}</span>
-                <span className={`font-bold ${scoreColor(m.value)}`}>{m.value}</span>
+          {selected ? (
+            <>
+              <div className="px-4 py-4 border-b border-gray-100">
+                <div className="flex items-center justify-between">
+                  <p className="font-bold text-gray-800 text-sm">{selected.user?.name || "Unknown"}</p>
+                  <span className={`text-2xl font-black ${scoreColor(selected.score)}`}>{selected.score}</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-0.5">Sales · Score</p>
               </div>
-            ))}
-          </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <RadarChart data={[
+                  { subject: "Distance", A: selected.metrics?.distance || 0 },
+                  { subject: "Tasks", A: selected.metrics?.taskCompletion || 0 },
+                  { subject: "Attendance", A: selected.metrics?.attendance || 0 },
+                  { subject: "Visits", A: selected.metrics?.visits || 0 },
+                ]} margin={{ top: 20, right: 30, bottom: 10, left: 30 }}>
+                  <PolarGrid stroke="#f3f4f6" />
+                  <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10 }} />
+                  <Radar dataKey="A" stroke="#f97316" fill="#f97316" fillOpacity={0.2} strokeWidth={2} />
+                </RadarChart>
+              </ResponsiveContainer>
+              <div className="px-4 pb-4 grid grid-cols-2 gap-2">
+                {[
+                  { label: "Distance", value: `${selected.metrics?.distance || 0} km` },
+                  { label: "Tasks Done", value: selected.metrics?.taskCompletion || 0 },
+                  { label: "Attendance", value: selected.metrics?.attendance || 0 },
+                  { label: "Visits", value: selected.metrics?.visits || 0 },
+                ].map((m: any) => (
+                  <div key={m.label} className="flex items-center justify-between text-xs py-1 border-b border-gray-50">
+                    <span className="text-gray-500">{m.label}</span>
+                    <span className={`font-bold text-gray-700`}>{m.value}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="p-10 flex items-center justify-center text-gray-400 h-full">
+              <p>Select an employee to view details.</p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Department comparison */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <TrendingUp className="h-4 w-4 text-orange-500" />
-          <h3 className="font-bold text-gray-800">Department Comparison</h3>
-        </div>
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={[
-            { dept: "Sales", avg: Math.round([92,84,65].reduce((a,b)=>a+b,0)/3) },
-            { dept: "Technical", avg: Math.round([89,81,58].reduce((a,b)=>a+b,0)/3) },
-            { dept: "Support", avg: Math.round([86,71].reduce((a,b)=>a+b,0)/2) },
-          ]}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-            <XAxis dataKey="dept" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-            <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-            <Tooltip contentStyle={{ borderRadius: 10, border: "none" }} />
-            <Bar dataKey="avg" fill="#f97316" radius={[8, 8, 0, 0]} name="Avg Score" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
     </div>
   );
 }

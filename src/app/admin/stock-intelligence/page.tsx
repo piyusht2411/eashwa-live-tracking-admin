@@ -1,70 +1,117 @@
 "use client";
 
-import { useState } from "react";
-import { Package, TrendingUp, TrendingDown, AlertCircle, Battery, BarChart2 } from "lucide-react";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-} from "recharts";
+import { useState, useEffect, useMemo } from "react";
+import { Package, MapPin, Calendar, Search, ChevronRight, Loader2, User } from "lucide-react";
+import Link from "next/link";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store";
+import { getStockSubmissions } from "@/lib/api";
+import { toast } from "sonner";
 
-const models = [
-  { name: "Eashwa Pro X", category: "Performance", sold: 142, stock: 8, trend: "fast", battery: 12, demandArea: "Mumbai South" },
-  { name: "Eashwa City 125", category: "Commuter", sold: 128, stock: 22, trend: "fast", battery: 30, demandArea: "Thane" },
-  { name: "Eashwa Cargo Plus", category: "Utility", sold: 89, stock: 15, trend: "fast", battery: 8, demandArea: "Navi Mumbai" },
-  { name: "Eashwa Swift", category: "Commuter", sold: 74, stock: 45, trend: "medium", battery: 55, demandArea: "Pune" },
-  { name: "Eashwa Legend", category: "Premium", sold: 61, stock: 31, trend: "medium", battery: 40, demandArea: "Mumbai North" },
-  { name: "Eashwa Eco", category: "Eco", sold: 43, stock: 68, trend: "slow", battery: 90, demandArea: "Nashik" },
-  { name: "Eashwa MaxLoad", category: "Utility", sold: 28, stock: 80, trend: "slow", battery: 110, demandArea: "Kolhapur" },
-  { name: "Eashwa GT Sport", category: "Performance", sold: 19, stock: 54, trend: "slow", battery: 75, demandArea: "Aurangabad" },
-];
-
-const areaData = [
-  { area: "Mumbai South", demand: 92 },
-  { area: "Thane", demand: 78 },
-  { area: "Navi Mumbai", demand: 65 },
-  { area: "Pune", demand: 58 },
-  { area: "Mumbai North", demand: 55 },
-  { area: "Nashik", demand: 38 },
-];
-
-const trendConfig: Record<string, { label: string; color: string; icon: any; bg: string }> = {
-  fast: { label: "Fast Moving", color: "text-green-600", icon: TrendingUp, bg: "bg-green-100" },
-  medium: { label: "Moderate", color: "text-orange-500", icon: BarChart2, bg: "bg-orange-100" },
-  slow: { label: "Slow Moving", color: "text-red-500", icon: TrendingDown, bg: "bg-red-100" },
-};
+export interface StockSubmission {
+  taskId: string;
+  employee: string;
+  showroom: string;
+  date: string;
+  item: string;
+  qty: number;
+  itemType?: "scooter" | "battery" | string;
+}
 
 export default function StockIntelligencePage() {
-  const [filter, setFilter] = useState("all");
+  const [submissions, setSubmissions] = useState<StockSubmission[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [monthFilter, setMonthFilter] = useState("");
+  const token = useSelector((state: RootState) => state.auth.authToken);
 
-  const filtered = models.filter(m => filter === "all" || m.trend === filter);
-  const alerts = models.filter(m => m.battery < 20);
+  useEffect(() => {
+    const fetchStock = async () => {
+      if (!token) return;
+      try {
+        setLoading(true);
+        const res = await getStockSubmissions(token);
+        setSubmissions(res.data || []);
+      } catch {
+        toast.error("Failed to load stock data");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStock();
+  }, [token]);
+
+  // Aggregate by showroom
+  const showroomData = useMemo(() => {
+    const map: Record<string, {
+      showroom: string;
+      totalStock: number;
+      scooters: number;
+      batteries: number;
+      lastExecutive: string;
+      lastDate: string;
+      submissions: StockSubmission[];
+    }> = {};
+
+    submissions.forEach(sub => {
+      if (!map[sub.showroom]) {
+        map[sub.showroom] = {
+          showroom: sub.showroom,
+          totalStock: 0,
+          scooters: 0,
+          batteries: 0,
+          lastExecutive: sub.employee,
+          lastDate: sub.date,
+          submissions: [],
+        };
+      }
+      map[sub.showroom].totalStock += sub.qty;
+      map[sub.showroom].submissions.push(sub);
+      // Determine type by item name heuristic or itemType field
+      const isBattery = (sub.itemType === "battery") || sub.item.toLowerCase().includes("battery") || sub.item.toLowerCase().includes("bat");
+      if (isBattery) {
+        map[sub.showroom].batteries += sub.qty;
+      } else {
+        map[sub.showroom].scooters += sub.qty;
+      }
+      // Track most recent update
+      if (new Date(sub.date) >= new Date(map[sub.showroom].lastDate)) {
+        map[sub.showroom].lastExecutive = sub.employee;
+        map[sub.showroom].lastDate = sub.date;
+      }
+    });
+
+    return Object.values(map).sort((a, b) => b.totalStock - a.totalStock);
+  }, [submissions]);
+
+  // Filter showrooms
+  const filtered = useMemo(() => showroomData.filter(s => {
+    if (search && !s.lastExecutive.toLowerCase().includes(search.toLowerCase())) return false;
+    if (monthFilter) {
+      const d = new Date(s.lastDate);
+      const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (m !== monthFilter) return false;
+    }
+    return true;
+  }), [showroomData, search, monthFilter]);
+
+  const totalScooters = showroomData.reduce((s, r) => s + r.scooters, 0);
+  const totalBatteries = showroomData.reduce((s, r) => s + r.batteries, 0);
 
   return (
     <div className="p-6 space-y-5">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-black text-gray-800">Sales & Stock Intelligence</h1>
-        <p className="text-sm text-gray-500">Model-wise sales trends, stock levels, and area demand insights</p>
+        <p className="text-sm text-gray-500">Showroom-wise stock visibility and inventory insights</p>
       </div>
 
-      {/* Alerts */}
-      {alerts.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="font-bold text-red-700 text-sm">Battery Stock Alert</p>
-            <p className="text-xs text-red-600 mt-0.5">
-              {alerts.map(m => `${m.name} (${m.battery} units)`).join(", ")} have critically low battery stock.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Summary cards */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Fast Moving", value: models.filter(m => m.trend === "fast").length, color: "bg-green-50 border-green-100 text-green-600" },
-          { label: "Slow Moving", value: models.filter(m => m.trend === "slow").length, color: "bg-red-50 border-red-100 text-red-500" },
-          { label: "Low Battery Stock", value: alerts.length, color: "bg-orange-50 border-orange-100 text-orange-600" },
+          { label: "Total Showrooms", value: showroomData.length, color: "bg-blue-50 border-blue-100 text-blue-600" },
+          { label: "Total Scooters", value: totalScooters, color: "bg-orange-50 border-orange-100 text-orange-600" },
+          { label: "Total Batteries", value: totalBatteries, color: "bg-green-50 border-green-100 text-green-600" },
         ].map(s => (
           <div key={s.label} className={`rounded-2xl border p-4 ${s.color}`}>
             <p className="text-3xl font-black">{s.value}</p>
@@ -73,90 +120,101 @@ export default function StockIntelligencePage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Models table */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 flex-wrap">
-            <div className="flex items-center gap-2">
-              <Package className="h-4 w-4 text-orange-500" />
-              <span className="font-bold text-gray-800">Model Overview</span>
-            </div>
-            <div className="flex gap-1 ml-auto">
-              {["all", "fast", "medium", "slow"].map(f => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  className={`px-3 py-1 text-xs font-semibold rounded-lg capitalize transition-all ${
-                    filter === f ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-orange-50"
-                  }`}
-                >
-                  {f}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/50">
-                  {["Model", "Category", "Sold", "Stock", "Battery", "Trend"].map(h => (
-                    <th key={h} className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-2.5">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((m, i) => {
-                  const tc = trendConfig[m.trend];
-                  const TrendIcon = tc.icon;
-                  return (
-                    <tr key={i} className="border-b border-gray-50 hover:bg-orange-50/20">
-                      <td className="px-4 py-3">
-                        <p className="text-sm font-semibold text-gray-800">{m.name}</p>
-                        <p className="text-xs text-gray-400">{m.demandArea}</p>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{m.category}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-gray-700">{m.sold}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-sm font-bold ${m.stock < 20 ? "text-red-500" : "text-gray-700"}`}>{m.stock}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          <Battery className={`h-3.5 w-3.5 ${m.battery < 20 ? "text-red-500" : "text-gray-400"}`} />
-                          <span className={`text-sm ${m.battery < 20 ? "text-red-500 font-bold" : "text-gray-600"}`}>{m.battery}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full w-fit ${tc.bg}`}>
-                          <TrendIcon className={`h-3 w-3 ${tc.color}`} />
-                          <span className={`text-xs font-semibold ${tc.color}`}>{tc.label}</span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="relative flex-1 min-w-48">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by executive name..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none bg-white"
+          />
         </div>
-
-        {/* Area demand */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h3 className="font-bold text-gray-800 mb-4">Area-wise Demand</h3>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={areaData} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis type="category" dataKey="area" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} width={80} />
-              <Tooltip contentStyle={{ borderRadius: 8, border: "none" }} />
-              <Bar dataKey="demand" radius={[0, 6, 6, 0]} name="Demand Score">
-                {areaData.map((_, i) => (
-                  <Cell key={i} fill={i < 3 ? "#f97316" : "#fed7aa"} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <input
+          type="month"
+          value={monthFilter}
+          onChange={e => setMonthFilter(e.target.value)}
+          className="px-3 py-2.5 text-sm rounded-xl border border-gray-200 focus:border-orange-400 outline-none bg-white font-medium text-gray-700"
+        />
+        {(search || monthFilter) && (
+          <button
+            onClick={() => { setSearch(""); setMonthFilter(""); }}
+            className="px-3 py-2.5 text-sm rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
+          >
+            Clear
+          </button>
+        )}
       </div>
+
+      {/* Showroom Cards Grid */}
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+          <Loader2 className="h-8 w-8 animate-spin text-orange-400 mb-3" />
+          <p>Loading stock data...</p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-12 text-center text-gray-400">
+          <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <p className="text-sm font-semibold text-gray-700">No showroom data found</p>
+          <p className="text-xs">No stock submissions match the current filters.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map(s => (
+            <Link
+              key={s.showroom}
+              href={`/admin/stock-intelligence/${encodeURIComponent(s.showroom)}`}
+              className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:border-orange-300 hover:shadow-md transition-all group"
+            >
+              <div className="p-5 space-y-4">
+                {/* Showroom Name */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-orange-50 border border-orange-100">
+                      <MapPin className="h-4 w-4 text-orange-500" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-800 text-sm leading-tight">{s.showroom}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Click to view details</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-orange-400 flex-shrink-0 mt-1 transition-colors" />
+                </div>
+
+                {/* Stock Numbers */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-gray-50 rounded-xl p-2.5 text-center">
+                    <p className="text-xl font-black text-gray-800">{s.totalStock}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Total</p>
+                  </div>
+                  <div className="bg-orange-50 rounded-xl p-2.5 text-center">
+                    <p className="text-xl font-black text-orange-600">{s.scooters}</p>
+                    <p className="text-xs text-orange-400 mt-0.5">Scooters</p>
+                  </div>
+                  <div className="bg-green-50 rounded-xl p-2.5 text-center">
+                    <p className="text-xl font-black text-green-600">{s.batteries}</p>
+                    <p className="text-xs text-green-400 mt-0.5">Batteries</p>
+                  </div>
+                </div>
+
+                {/* Executive & Date */}
+                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                    <User className="h-3 w-3 text-gray-400" />
+                    <span className="font-medium">{s.lastExecutive}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-gray-400">
+                    <Calendar className="h-3 w-3" />
+                    {new Date(s.lastDate).toLocaleDateString()}
+                  </div>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

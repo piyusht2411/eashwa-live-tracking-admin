@@ -12,6 +12,7 @@ import {
 } from "redux-persist";
 import storage from "redux-persist/lib/storage";
 import authReducer from "./authSlice";
+import employeeReducer from "./employeeSlice";
 
 const persistConfig = {
   key: "auth", // ← Key name in localStorage
@@ -24,6 +25,7 @@ const persistedReducer = persistReducer(persistConfig, authReducer);
 export const store = configureStore({
   reducer: {
     auth: persistedReducer,
+    employees: employeeReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

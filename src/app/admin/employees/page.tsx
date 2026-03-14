@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Search, MapPin, TrendingUp, Eye, Phone, Plus, Loader2 } from "lucide-react";
+import { Search, MapPin, TrendingUp, Eye, Phone, Plus, Loader2, Trash2, Edit } from "lucide-react";
 import Link from "next/link";
 import AddEmployeeModal from "@/components/AddEmployeeModal";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
-import { getEmployees } from "@/lib/api";
+import { getEmployees, deleteEmployee } from "@/lib/api";
 import { toast } from "sonner";
+import EditEmployeeModal from "@/components/EditEmployeeModal";
 
 export interface Employee {
   _id: string;
@@ -23,6 +24,7 @@ export interface Employee {
   status?: string;
   location?: string;
   punchIn?: string;
+  profilePicture?: string;
 }
 
 const statusConfig: Record<string, { label: string; color: string; dot: string }> = {
@@ -37,21 +39,23 @@ export default function EmployeesPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const token = useSelector((state: RootState) => state.auth.authToken);
 
+  const fetchEmployees = async () => {
+    if (!token) return;
+    try {
+      setLoading(true);
+      const response = await getEmployees(token, "", "");
+      setEmployees(response.data || []);
+    } catch {
+      toast.error("Failed to load employees");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchEmployees = async () => {
-      if (!token) return;
-      try {
-        setLoading(true);
-        const response = await getEmployees(token, "", "");
-        setEmployees(response.data || []);
-      } catch {
-        toast.error("Failed to load employees");
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchEmployees();
   }, [token]);
 
@@ -69,6 +73,23 @@ export default function EmployeesPage() {
   const scoreColor = (score: number) =>
     score >= 85 ? "text-green-600" : score >= 70 ? "text-orange-500" : "text-red-500";
 
+  // DELETE HANDLER
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Delete employee "${name}"? This action cannot be undone.`)) return;
+
+    try {
+      if (!token) {
+        toast.error("Authentication token missing. Please login again.");
+        return;
+      }
+      await deleteEmployee(token, id);
+      await fetchEmployees();
+      toast.success(`Employee "${name}" deleted successfully`);
+    } catch {
+      toast.error("Failed to delete employee");
+    }
+  };
+
   return (
     <div className="p-6 space-y-5">
       {/* Header */}
@@ -85,7 +106,13 @@ export default function EmployeesPage() {
         </button>
       </div>
 
-      <AddEmployeeModal open={showAddModal} onClose={() => setShowAddModal(false)} />
+      <AddEmployeeModal open={showAddModal} onClose={() => setShowAddModal(false)} onSuccess={fetchEmployees} />
+      <EditEmployeeModal
+        open={!!editingId}
+        employeeId={editingId!}
+        onClose={() => setEditingId(null)}
+        onSuccess={fetchEmployees}           // ← NEW
+      />
 
       {/* Search */}
       <div className="flex flex-wrap gap-3">
@@ -129,8 +156,18 @@ export default function EmployeesPage() {
                 <div className="p-5 space-y-4">
                   {/* Avatar & Status */}
                   <div className="flex items-start justify-between">
-                    <div className="w-14 h-14 rounded-2xl bg-orange-100 flex items-center justify-center text-orange-600 font-black text-xl">
-                      {initials}
+                    <div className="relative w-14 h-14 rounded-2xl overflow-hidden border-2 border-orange-100 shadow-inner">
+                      {emp.profilePicture ? (
+                        <img
+                          src={emp.profilePicture}
+                          alt={emp.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-orange-100 flex items-center justify-center text-orange-600 font-black text-xl">
+                          {initials}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5">
                       <div className={`w-2 h-2 rounded-full ${sc.dot}`} />
@@ -181,11 +218,18 @@ export default function EmployeesPage() {
                         <Eye className="h-3.5 w-3.5" /> View Profile
                       </button>
                     </Link>
-                    {emp.phone && (
-                      <a href={`tel:${emp.phone}`} className="p-2 rounded-xl bg-green-50 hover:bg-green-100 text-green-600 transition-colors">
-                        <Phone className="h-3.5 w-3.5" />
-                      </a>
-                    )}
+                    <button
+                      onClick={() => setEditingId(emp._id)}
+                      className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-600 transition-colors"
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(emp._id, emp.name)}
+                      className="p-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 transition-colors"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
               </div>

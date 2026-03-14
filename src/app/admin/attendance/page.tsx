@@ -30,6 +30,15 @@ const statusConfig: Record<string, { label: string; color: string; icon: any }> 
   leave: { label: "On Leave", color: "bg-blue-100 text-blue-700", icon: Clock },
 };
 
+const toDateString = (d: Date) => {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const isToday = (d: Date) => toDateString(d) === toDateString(new Date());
+
 export default function AttendancePage() {
   const [employeeFilter, setEmployeeFilter] = useState("All");
   const [autoPunchOutOnly, setAutoPunchOutOnly] = useState(false);
@@ -42,9 +51,9 @@ export default function AttendancePage() {
     if (!token) return;
     try {
       setLoading(true);
-      const yyyy = currentDate.getFullYear();
-      const mm = String(currentDate.getMonth() + 1).padStart(2, "0");
-      const res = await getAttendance(token, `${yyyy}-${mm}`);
+      // Pass date only if not today (API defaults to today when no date given)
+      const dateParam = isToday(currentDate) ? undefined : toDateString(currentDate);
+      const res = await getAttendance(token, dateParam);
       setAttendanceRecords(res.data || []);
     } catch (err) {
       toast.error("Failed to load attendance records");
@@ -57,15 +66,23 @@ export default function AttendancePage() {
     fetchAttendance();
   }, [token, currentDate]);
 
-  const monthLabel = currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const dayLabel = isToday(currentDate)
+    ? "Today"
+    : currentDate.toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 
-  const prevMonth = () => {
-    setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)));
+  const prevDay = () => {
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() - 1);
+    setCurrentDate(d);
   };
 
-  const nextMonth = () => {
-    setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)));
+  const nextDay = () => {
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() + 1);
+    setCurrentDate(d);
   };
+
+  const canGoNext = !isToday(currentDate);
 
   const filtered = attendanceRecords.filter((r) => {
     if (employeeFilter !== "All" && r.user?.name !== employeeFilter) return false;
@@ -115,9 +132,15 @@ export default function AttendancePage() {
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">
         <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-200 px-3 py-2">
-          <button onClick={prevMonth} className="text-gray-400 hover:text-orange-500 transition-colors"><ChevronLeft className="h-4 w-4" /></button>
-          <span className="text-sm font-semibold text-gray-700 w-32 text-center">{monthLabel}</span>
-          <button onClick={nextMonth} className="text-gray-400 hover:text-orange-500 transition-colors"><ChevronRight className="h-4 w-4" /></button>
+          <button onClick={prevDay} className="text-gray-400 hover:text-orange-500 transition-colors"><ChevronLeft className="h-4 w-4" /></button>
+          <span className="text-sm font-semibold text-gray-700 w-40 text-center">{dayLabel}</span>
+          <button
+            onClick={nextDay}
+            disabled={!canGoNext}
+            className="text-gray-400 hover:text-orange-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
         <select
           value={employeeFilter}
@@ -135,7 +158,7 @@ export default function AttendancePage() {
         </button>
         <div className="flex items-center gap-2 text-xs text-gray-500">
           <Calendar className="h-4 w-4 text-orange-400" />
-          Showing month records
+          {dayLabel} records
         </div>
       </div>
 
@@ -161,7 +184,7 @@ export default function AttendancePage() {
               ) : filtered.length === 0 ? (
                  <tr>
                    <td colSpan={6} className="text-center py-10 text-sm text-gray-400">
-                     No attendance records found for this month.
+                     No attendance records found for {dayLabel.toLowerCase()}.
                    </td>
                  </tr>
               ) : (
@@ -220,7 +243,7 @@ export default function AttendancePage() {
           </table>
         </div>
         <div className="px-4 py-3 border-t border-gray-100 text-xs text-gray-400">
-          Showing {filtered.length} records for {employeeFilter === "All" ? "all employees" : employeeFilter}
+          Showing {filtered.length} records for {employeeFilter === "All" ? "all employees" : employeeFilter} · {dayLabel}
         </div>
       </div>
     </div>

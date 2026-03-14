@@ -30,19 +30,42 @@ export interface RegisterEmployeePayload {
 
 export async function registerEmployee(
   payload: RegisterEmployeePayload,
+  profilePictureFile: File | null,
   token: string
 ) {
+  const formData = new FormData();
+
+  formData.append("name", payload.name);
+  formData.append("email", payload.email);
+  formData.append("password", payload.password);
+  formData.append("phone", payload.phone);
+  formData.append("department", payload.department);
+  formData.append("role", payload.role);
+
+  if (payload.employeeId) formData.append("employeeId", payload.employeeId);
+  if (payload.post) formData.append("post", payload.post);
+  if (payload.address) formData.append("address", payload.address);
+  if (payload.aadhaarNumber !== undefined && payload.aadhaarNumber !== null) {
+    formData.append("aadhaarNumber", payload.aadhaarNumber.toString());
+  }
+  if (payload.managerId) formData.append("managerId", payload.managerId);
+  if (payload.joiningDate) formData.append("joiningDate", payload.joiningDate);
+
+  if (profilePictureFile) {
+    formData.append("profilePicture", profilePictureFile);
+  }
+
   const res = await fetch(`${API_BASE}/auth/register`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(payload),
+    body: formData,
   });
+
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || "Registration failed");
-  return data; // { token, user: { id, name, email, role, department, phone, ... } }
+  return data;
 }
 
 // ─── Employees ───────────────────────────────────────────────────────────────
@@ -68,24 +91,10 @@ export async function getEmployeeById(token: string, id: string) {
   return data;
 }
 
-export async function updateEmployee(token: string, id: string, payload: any) {
-  const res = await fetch(`${API_BASE}/users/${id}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || "Failed to update employee");
-  return data;
-}
-
 // ─── Dashboard Stats ─────────────────────────────────────────────────────────
 
-export async function getAdminDashboard(token: string) {
-  const res = await fetch(`${API_BASE}/admin/dashboard`, {
+export async function getAdminDashboard(token: string, period = "today") {
+  const res = await fetch(`${API_BASE}/admin/dashboard?period=${period}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
@@ -119,12 +128,29 @@ export async function getLocationHistory(token: string, userId: string, date?: s
 
 // ─── Attendance & Leave ──────────────────────────────────────────────────────
 
-export async function getAttendance(token: string, month: string) {
-  const res = await fetch(`${API_BASE}/attendance?month=${month}`, {
+export async function getAttendance(token: string, date?: string) {
+  const url = date
+    ? `${API_BASE}/attendance?date=${date}`
+    : `${API_BASE}/attendance`;
+  const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || "Failed to fetch attendance");
+  return data;
+}
+
+export async function createLeave(token: string, payload: { userId: string; type: string; date: string; reason?: string }) {
+  const res = await fetch(`${API_BASE}/leaves`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to create leave");
   return data;
 }
 
@@ -150,9 +176,9 @@ export async function deleteLeave(token: string, leaveId: string) {
 export async function updateLeaveStatus(token: string, leaveId: string, status: "approved" | "rejected") {
   const res = await fetch(`${API_BASE}/leaves/${leaveId}/status`, {
     method: "PUT",
-    headers: { 
+    headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}` 
+      Authorization: `Bearer ${token}`
     },
     body: JSON.stringify({ status }),
   });
@@ -199,7 +225,7 @@ export async function getGeofences(token: string, department?: string) {
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || "Failed to fetch geofences");
   // Assuming response structure { success: true, data: [] } or just [] depending on backend structure we plan. Spec says Array of Geofence objects
-  return data.data || data; 
+  return data.data || data;
 }
 
 export async function createGeofence(token: string, payload: any) {
@@ -234,7 +260,7 @@ export async function getStockSubmissions(token: string, start?: string, end?: s
   const params = new URLSearchParams();
   if (start) params.set("start", start);
   if (end) params.set("end", end);
-  
+
   const res = await fetch(`${API_BASE}/stock?${params}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -251,7 +277,7 @@ export async function exportReport(token: string, type: "attendance" | "performa
   const res = await fetch(`${API_BASE}/reports/export?${params}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  
+
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.message || "Failed to export report");
@@ -303,7 +329,7 @@ export async function getVisitRecords(token: string, params?: { employeeName?: s
 }
 
 export async function getBreakRecords(token: string) {
-  const res = await fetch(`${API_BASE}/breaks`, {
+  const res = await fetch(`${API_BASE}/breaks/all`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
@@ -312,7 +338,63 @@ export async function getBreakRecords(token: string) {
 }
 
 export const fetchAdminsAndManagers = async () => {
-  const response = await fetch(`${API_BASE}/auth/managers`);
+  const response = await fetch(`${API_BASE}/users/managers`);
   if (!response.ok) throw new Error('Failed to fetch admins/managers');
   return response.json();
 };
+
+// ─── Employees ───────────────────────────────────────────────────────────────
+
+// UPDATED: now supports profile picture upload (FormData) + works with PATCH/PUT
+export async function updateEmployee(
+  token: string,
+  id: string,
+  payload: any,
+  profilePictureFile: File | null = null
+) {
+  let body: BodyInit;
+  const headers: HeadersInit = { Authorization: `Bearer ${token}` };
+
+  if (profilePictureFile) {
+    const formData = new FormData();
+    Object.entries(payload).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        formData.append(key, String(value));
+      }
+    });
+    formData.append("profilePicture", profilePictureFile);
+    body = formData;
+    // browser automatically sets multipart/form-data
+  } else {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(payload);
+  }
+
+  const res = await fetch(`${API_BASE}/employees/${id}`, {
+    method: "PATCH",           // backend handles both PUT and PATCH
+    headers,
+    body,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to update employee");
+  return data;
+}
+
+// NEW: Delete (soft delete)
+export async function deleteEmployee(token: string, id: string) {
+  const res = await fetch(`${API_BASE}/employees/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to delete employee");
+  return data;
+}
+export async function getHeatmapData(token: string, period = "today") {
+  const res = await fetch(`${API_BASE}/heatmap?period=${period}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to fetch heatmap data');
+  return data;
+}

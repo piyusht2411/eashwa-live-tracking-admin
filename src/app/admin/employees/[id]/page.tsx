@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, use } from "react";
 import { ArrowLeft, MapPin, Phone, Clock, TrendingUp, Shield, Briefcase, Calendar, Loader2, Download, Package } from "lucide-react";
 import Link from "next/link";
 import {
@@ -51,7 +51,8 @@ interface StockSubmission {
 
 type TabType = "tracking" | "performance" | "hours" | "stock" | "same-location";
 
-export default function EmployeeDetailPage({ params }: { params: { id: string } }) {
+export default function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [tab, setTab] = useState<TabType>("tracking");
   const [emp, setEmp] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -67,10 +68,12 @@ export default function EmployeeDetailPage({ params }: { params: { id: string } 
 
   useEffect(() => {
     const fetchEmp = async () => {
-      if (!token || !params.id) return;
+      console.log("token", token);
+      console.log("params.id", id);
+      if (!token || !id) return;
       try {
         setLoading(true);
-        const res = await getEmployeeById(token, params.id);
+        const res = await getEmployeeById(token, id);
         setEmp(res.data);
       } catch {
         toast.error("Failed to load employee details");
@@ -79,24 +82,31 @@ export default function EmployeeDetailPage({ params }: { params: { id: string } 
       }
     };
     fetchEmp();
-  }, [token, params.id]);
+  }, [token, id]);
 
-  useEffect(() => {
-    if (tab !== "tracking" && tab !== "same-location") return;
-    const fetchLoc = async () => {
-      if (!token || !params.id) return;
-      try {
-        setLocLoading(true);
-        const res = await getEmployeeLocationHistory(token, params.id);
-        setLocationRecords(res.data || []);
-      } catch {
-        // Silently handle – may not have data yet
-      } finally {
-        setLocLoading(false);
-      }
-    };
-    fetchLoc();
-  }, [tab, token, params.id]);
+// Replace this entire useEffect with the one below
+useEffect(() => {
+  if (tab !== "tracking" && tab !== "same-location") return;
+
+  const fetchLoc = async () => {
+    if (!token || !id) return;
+    try {
+      setLocLoading(true);
+      const res = await getEmployeeLocationHistory(token, id);
+
+      // ← THIS IS THE FIX: always ensure it's an array
+      const rawData = res?.data ?? res ?? [];
+      setLocationRecords(Array.isArray(rawData) ? rawData : []);
+
+    } catch {
+      // Silently handle – may not have data yet
+      setLocationRecords([]);   // ← extra safety
+    } finally {
+      setLocLoading(false);
+    }
+  };
+  fetchLoc();
+}, [tab, token, id]);
 
   useEffect(() => {
     if (tab !== "stock") return;
@@ -180,7 +190,7 @@ export default function EmployeeDetailPage({ params }: { params: { id: string } 
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `location_tracking_${emp?.name || params.id}_${withFilters ? "filtered" : "all"}.csv`;
+    a.download = `location_tracking_${emp?.name || id}_${withFilters ? "filtered" : "all"}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };

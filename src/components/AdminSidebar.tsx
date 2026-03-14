@@ -80,13 +80,13 @@ const allMenuItems = [
     description: "Scoring & Rankings",
     roles: ["admin", "hr", "manager"],
   },
-  {
-    icon: FileBarChart2,
-    label: "Reports",
-    href: "/admin/reports",
-    description: "Download & Analytics",
-    roles: ["admin", "hr", "manager"],
-  },
+  // {
+  //   icon: FileBarChart2,
+  //   label: "Reports",
+  //   href: "/admin/reports",
+  //   description: "Download & Analytics",
+  //   roles: ["admin", "hr", "manager"],
+  // },
   {
     icon: Bell,
     label: "Alerts",
@@ -101,13 +101,13 @@ const allMenuItems = [
     description: "Sales & Stock Insights",
     roles: ["admin", "hr", "manager"],
   },
-  {
-    icon: Locate,
-    label: "Geo-Fencing",
-    href: "/admin/geo-fencing",
-    description: "Home Location & Zones",
-    roles: ["admin", "hr"],
-  },
+  // {
+  //   icon: Locate,
+  //   label: "Geo-Fencing",
+  //   href: "/admin/geo-fencing",
+  //   description: "Home Location & Zones",
+  //   roles: ["admin", "hr"],
+  // },
   {
     icon: Coffee,
     label: "Break Monitor",
@@ -115,13 +115,13 @@ const allMenuItems = [
     description: "Employee Break Tracking",
     roles: ["admin", "hr", "manager"],
   },
-  {
-    icon: Clock,
-    label: "Working Hours",
-    href: "/admin/working-hours",
-    description: "Shifts & Break Policies",
-    roles: ["admin", "hr"],
-  },
+  // {
+  //   icon: Clock,
+  //   label: "Working Hours",
+  //   href: "/admin/working-hours",
+  //   description: "Shifts & Break Policies",
+  //   roles: ["admin", "hr"],
+  // },
   {
     icon: Flame,
     label: "Heat Map",

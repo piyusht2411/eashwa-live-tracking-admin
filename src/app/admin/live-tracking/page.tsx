@@ -10,10 +10,17 @@ import { toast } from "sonner";
 
 const Map = dynamic(() => import("@/components/LiveMap"), { ssr: false });
 
-const statusColor: Record<string, { badge: string; dot: string; mapColor: "orange" | "green" | "default" }> = {
-  active: { badge: "bg-green-100 text-green-700", dot: "bg-green-500", mapColor: "green" },
-  idle: { badge: "bg-yellow-100 text-yellow-700", dot: "bg-yellow-500", mapColor: "orange" },
-  break: { badge: "bg-blue-100 text-blue-700", dot: "bg-blue-500", mapColor: "default" },
+const USER_COLORS = [
+  "#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4",
+  "#3b82f6", "#8b5cf6", "#ec4899", "#14b8a6", "#f59e0b",
+  "#84cc16", "#a855f7", "#0ea5e9", "#fb923c", "#10b981",
+];
+
+const statusBadge: Record<string, { badge: string; dot: string }> = {
+  active: { badge: "bg-green-100 text-green-700", dot: "bg-green-500" },
+  idle:   { badge: "bg-yellow-100 text-yellow-700", dot: "bg-yellow-500" },
+  break:  { badge: "bg-blue-100 text-blue-700", dot: "bg-blue-500" },
+  offline:{ badge: "bg-gray-100 text-gray-500", dot: "bg-gray-400" },
 };
 
 export interface LiveLocation {
@@ -73,19 +80,24 @@ export default function LiveTrackingPage() {
     }
   }, [selected, token]);
 
-  const filtered = locations;
+  const enriched = locations.map((e, i) => ({
+    ...e,
+    userColor: USER_COLORS[i % USER_COLORS.length],
+  }));
 
-  const selectedEmp = locations.find((e) => e.id === selected);
+  const filtered = enriched;
+
+  const selectedEmp = filtered.find((e) => e.id === selected);
   const mapCenter: [number, number] = selectedEmp
     ? [selectedEmp.latitude, selectedEmp.longitude]
-    : locations.length > 0
-      ? [locations[0].latitude, locations[0].longitude]
+    : filtered.length > 0
+      ? [filtered[0].latitude, filtered[0].longitude]
       : [19.1, 72.87];
 
   const markers = filtered.map((e) => ({
     position: [e.latitude, e.longitude] as [number, number],
     label: e.name,
-    color: statusColor[e.status]?.mapColor ?? "default",
+    color: e.userColor,
     popup: `${e.department} · ${e.status} · ${new Date(e.lastUpdate).toLocaleTimeString()}`,
   }));
 
@@ -132,7 +144,7 @@ export default function LiveTrackingPage() {
             </div>
           ) : (
             filtered.map((emp) => {
-              const sc = statusColor[emp.status] || { badge: "bg-gray-100 text-gray-700", dot: "bg-gray-500", mapColor: "default" };
+              const sc = statusBadge[emp.status] || { badge: "bg-gray-100 text-gray-500", dot: "bg-gray-400" };
               const isSelected = selected === emp.id;
 
               const formatTime = (ts: string) => {
@@ -150,15 +162,22 @@ export default function LiveTrackingPage() {
                     }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-full bg-orange-100 text-orange-600 font-bold text-sm flex items-center justify-center flex-shrink-0">
+                    {/* Avatar with user's unique map color as ring */}
+                    <div
+                      className="w-9 h-9 rounded-full font-bold text-sm flex items-center justify-center flex-shrink-0 text-white"
+                      style={{ background: emp.userColor }}
+                    >
                       {emp.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1">
                         <p className="text-sm font-semibold text-gray-800 truncate">{emp.name}</p>
-                        <div className="flex items-center gap-1">
-                          <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${sc.dot}`} />
-                        </div>
+                        {/* Map color dot indicator */}
+                        <div
+                          className="w-3 h-3 rounded-full flex-shrink-0 border-2 border-white shadow"
+                          style={{ background: emp.userColor }}
+                          title="Map marker color"
+                        />
                       </div>
                       <p className="text-xs text-gray-400 mt-0.5">{emp.department}</p>
                     </div>
@@ -198,25 +217,27 @@ export default function LiveTrackingPage() {
       <div className="flex-1 relative">
         <Map
           center={mapCenter}
-          zoom={selected ? 14 : 11}
+          zoom={selected ? 15 : 12}
           markers={markers}
-          route={routePoints} // pass route property to Leaflet wrapper if supported
+          route={routePoints}
           height="100%"
+          autoFit={!selected}
         />
-        {/* Map overlay legend */}
-        <div className="absolute top-4 right-4 bg-white rounded-xl shadow-lg border border-gray-100 p-3 space-y-2 z-10">
-          <p className="text-xs font-bold text-gray-600 uppercase tracking-wide">Legend</p>
-          {[
-            { color: "bg-green-500", label: "Active" },
-            { color: "bg-yellow-500", label: "Idle" },
-            { color: "bg-blue-500", label: "On Break" },
-          ].map(l => (
-            <div key={l.label} className="flex items-center gap-2 text-xs text-gray-600">
-              <div className={`w-2.5 h-2.5 rounded-full ${l.color}`} />
-              {l.label}
-            </div>
-          ))}
-        </div>
+        {/* Map overlay legend — per-user colors */}
+        {filtered.length > 0 && (
+          <div className="absolute top-4 right-4 bg-white rounded-xl shadow-lg border border-gray-100 p-3 space-y-1.5 z-10 max-h-60 overflow-y-auto">
+            <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Employees</p>
+            {filtered.map((emp) => (
+              <div key={emp.id} className="flex items-center gap-2 text-xs text-gray-700">
+                <div
+                  className="w-3 h-3 rounded-full flex-shrink-0 border border-white shadow-sm"
+                  style={{ background: emp.userColor }}
+                />
+                <span className="truncate max-w-[120px]">{emp.name}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

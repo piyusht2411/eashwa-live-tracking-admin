@@ -149,7 +149,7 @@ export default function LoginPage() {
           </form>
 
           {/* Demo Credentials */}
-          <div className="mt-6 pt-6 border-t border-gray-100">
+          {/* <div className="mt-6 pt-6 border-t border-gray-100">
             <p className="text-xs text-gray-400 text-center mb-3 flex items-center gap-2 justify-center">
               <Shield className="h-3 w-3" /> Demo credentials
             </p>
@@ -164,7 +164,7 @@ export default function LoginPage() {
                 </button>
               ))}
             </div>
-          </div>
+          </div> */}
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">

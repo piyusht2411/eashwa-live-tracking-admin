@@ -17,15 +17,23 @@ import employeeReducer from "./employeeSlice";
 const persistConfig = {
   key: "auth", // ← Key name in localStorage
   storage,
-  whitelist: ["user", "authToken", "phone"], // ← Only persist these
+  whitelist: ["user", "authToken", "isAuthenticated"], // ← Only persist these
+};
+
+// Employees persist (add this)
+const employeePersistConfig = {
+  key: "employees",
+  storage,
+  whitelist: ["employees"] // optional - persist whole slice
 };
 
 const persistedReducer = persistReducer(persistConfig, authReducer);
+const persistedEmployeeReducer = persistReducer(employeePersistConfig, employeeReducer);
 
 export const store = configureStore({
   reducer: {
     auth: persistedReducer,
-    employees: employeeReducer,
+    employees: persistedEmployeeReducer
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

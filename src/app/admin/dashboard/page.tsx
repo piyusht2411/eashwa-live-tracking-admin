@@ -6,8 +6,8 @@ import { RootState } from "@/store";
 import { getAdminDashboard } from "@/lib/api";
 import { toast } from "sonner";
 import {
-  Users, MapPin, TrendingUp, AlertTriangle,
-  Clock, CheckCircle2, XCircle, Activity,
+  Users, MapPin, AlertTriangle,
+  CheckCircle2, XCircle, Activity,
   ChevronUp, ChevronDown, ArrowRight, Loader2,
 } from "lucide-react";
 import Link from "next/link";
@@ -15,15 +15,6 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-
-// Top performers can remain mocked for now unless the API also returns it
-const topPerformers = [
-  { name: "Amit Verma", dept: "Sales", score: 92, status: "active" },
-  { name: "Sonal Patel", dept: "Technical", score: 89, status: "active" },
-  { name: "Rahul Mishra", dept: "Support", score: 86, status: "active" },
-  { name: "Kavita Nair", dept: "Sales", score: 84, status: "active" },
-  { name: "Deepak Joshi", dept: "Technical", score: 81, status: "active" },
-];
 
 const colorMap: Record<string, string> = {
   orange: "bg-orange-100 text-orange-600",
@@ -38,7 +29,6 @@ const severityColor: Record<string, string> = {
   low: "bg-blue-100 text-blue-700",
 };
 
-// Define the shape of our API response data
 interface DashboardData {
   totalEmployees: number;
   activeNow: number;
@@ -52,6 +42,7 @@ interface DashboardData {
     status: string;
     description?: string;
   }[];
+  topPerformers?: { name: string; department: string; score: number }[];
 }
 
 export default function DashboardPage() {
@@ -65,7 +56,7 @@ export default function DashboardPage() {
       if (!token) return;
       try {
         setLoading(true);
-        const response = await getAdminDashboard(token);
+        const response = await getAdminDashboard(token, tab);
         setData(response.data);
       } catch (err: unknown) {
         toast.error(err instanceof Error ? err.message : "Failed to load dashboard data");
@@ -74,7 +65,7 @@ export default function DashboardPage() {
       }
     }
     loadDashboard();
-  }, [token, tab]); // Refetch if tab changes later (though current API doesn't use tab param)
+  }, [token, tab]);
 
   if (loading) {
     return (
@@ -100,7 +91,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-black text-gray-800">Dashboard</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Monday, March 9, 2026 · Field Operations Overview
+            {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} · Field Operations Overview
           </p>
         </div>
         <div className="flex gap-2">
@@ -108,7 +99,11 @@ export default function DashboardPage() {
             <button
               key={t}
               onClick={() => setTab(t)}
-              className="px-4 py-2 text-sm font-semibold rounded-lg border border-orange-200 text-orange-600 hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all capitalize"
+              className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-all capitalize ${
+                tab === t
+                  ? "bg-orange-500 text-white border-orange-500"
+                  : "border-orange-200 text-orange-600 hover:bg-orange-500 hover:text-white hover:border-orange-500"
+              }`}
             >
               {t}
             </button>
@@ -195,23 +190,27 @@ export default function DashboardPage() {
             </Link>
           </div>
           <div className="space-y-3">
-            {topPerformers.map((emp, i) => (
-              <div key={emp.name} className="flex items-center gap-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${i === 0 ? "bg-orange-500 text-white" : i === 1 ? "bg-gray-200 text-gray-600" : "bg-orange-50 text-orange-400"}`}>
-                  {i + 1}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-800 truncate">{emp.name}</p>
-                  <p className="text-xs text-gray-400">{emp.dept}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-20 bg-gray-100 rounded-full h-1.5">
-                    <div className="h-1.5 bg-orange-500 rounded-full" style={{ width: `${emp.score}%` }} />
+            {!data.topPerformers || data.topPerformers.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">No performance data available</p>
+            ) : (
+              data.topPerformers.map((emp, i) => (
+                <div key={emp.name} className="flex items-center gap-3">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${i === 0 ? "bg-orange-500 text-white" : i === 1 ? "bg-gray-200 text-gray-600" : "bg-orange-50 text-orange-400"}`}>
+                    {i + 1}
                   </div>
-                  <span className="text-sm font-bold text-orange-600 w-8 text-right">{emp.score}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 truncate">{emp.name}</p>
+                    <p className="text-xs text-gray-400">{emp.department}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-20 bg-gray-100 rounded-full h-1.5">
+                      <div className="h-1.5 bg-orange-500 rounded-full" style={{ width: `${emp.score}%` }} />
+                    </div>
+                    <span className="text-sm font-bold text-orange-600 w-8 text-right">{emp.score}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 

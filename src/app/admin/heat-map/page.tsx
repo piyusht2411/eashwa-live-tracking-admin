@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Flame, Calendar, Users, X, ChevronRight } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Flame, Calendar, Users, X, ChevronRight, Loader2 } from "lucide-react";
 import dynamic from "next/dynamic";
+import { getHeatmapData } from "@/lib/api";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store";
 
 const Map = dynamic(() => import("@/components/LiveMap"), { ssr: false });
 
@@ -18,113 +21,65 @@ interface Zone {
   color: string;
   employees: ZoneEmployee[];
   mapPosition: [number, number];
+  radius?: number; // Spread radius in meters
 }
 
-const zones: Zone[] = [
-  {
-    name: "Andheri East",
-    totalVisits: 42,
-    coverage: "High",
-    color: "bg-red-100 text-red-700 border-red-200",
-    mapPosition: [19.1300, 72.8560],
-    employees: [
-      { name: "Rahul Sharma", visits: 18 },
-      { name: "Priya Singh", visits: 14 },
-      { name: "Amit Kumar", visits: 10 },
-    ],
-  },
-  {
-    name: "Bandra",
-    totalVisits: 38,
-    coverage: "High",
-    color: "bg-red-100 text-red-700 border-red-200",
-    mapPosition: [19.0544, 72.8376],
-    employees: [
-      { name: "Sunita Patel", visits: 22 },
-      { name: "Rahul Sharma", visits: 16 },
-    ],
-  },
-  {
-    name: "Borivali",
-    totalVisits: 29,
-    coverage: "Medium",
-    color: "bg-orange-100 text-orange-700 border-orange-200",
-    mapPosition: [19.2285, 72.8580],
-    employees: [
-      { name: "Amit Kumar", visits: 15 },
-      { name: "Deepak Joshi", visits: 14 },
-    ],
-  },
-  {
-    name: "Dadar",
-    totalVisits: 22,
-    coverage: "Medium",
-    color: "bg-orange-100 text-orange-700 border-orange-200",
-    mapPosition: [19.0211, 72.8450],
-    employees: [
-      { name: "Priya Singh", visits: 12 },
-      { name: "Ravi Rao", visits: 10 },
-    ],
-  },
-  {
-    name: "Malad",
-    totalVisits: 18,
-    coverage: "Medium",
-    color: "bg-yellow-100 text-yellow-700 border-yellow-200",
-    mapPosition: [19.1620, 72.8414],
-    employees: [
-      { name: "Deepak Joshi", visits: 10 },
-      { name: "Sunita Patel", visits: 8 },
-    ],
-  },
-  {
-    name: "Thane East",
-    totalVisits: 15,
-    coverage: "Low",
-    color: "bg-green-100 text-green-700 border-green-200",
-    mapPosition: [19.2183, 72.9780],
-    employees: [
-      { name: "Ravi Rao", visits: 9 },
-      { name: "Amit Kumar", visits: 6 },
-    ],
-  },
-  {
-    name: "Kurla",
-    totalVisits: 8,
-    coverage: "Low",
-    color: "bg-green-100 text-green-700 border-green-200",
-    mapPosition: [19.0726, 72.8793],
-    employees: [
-      { name: "Rahul Sharma", visits: 8 },
-    ],
-  },
-  {
-    name: "Mulund",
-    totalVisits: 5,
-    coverage: "Low",
-    color: "bg-green-100 text-green-700 border-green-200",
-    mapPosition: [19.1726, 72.9560],
-    employees: [
-      { name: "Priya Singh", visits: 5 },
-    ],
-  },
-];
+// Mock data removed in favor of API
 
 export default function HeatMapPage() {
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("week");
   const [coverageFilter, setCoverageFilter] = useState("all");
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
+   const token = useSelector((state: RootState) => state.auth.authToken);
+
+  useEffect(() => {
+    async function fetchData() {
+      if (!token) return;
+      setLoading(true);
+      try {
+        const res = await getHeatmapData(token, period);
+        if (res.success) {
+          // Add default color mapping if backend doesn't provide it
+          const dataWithColors = res.data.map((z: any) => ({
+            ...z,
+            color: z.color || (
+              z.coverage === "High" ? "bg-red-100 text-red-700 border-red-200" :
+              z.coverage === "Medium" ? "bg-orange-100 text-orange-700 border-orange-200" :
+              "bg-green-100 text-green-700 border-green-200"
+            ),
+            radius: z.radius || (z.coverage === "High" ? 1000 : z.coverage === "Medium" ? 700 : 400)
+          }));
+          setZones(dataWithColors);
+        }
+      } catch (err) {
+        console.error("Heatmap fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [period]);
 
   const filteredZones = useMemo(() =>
     zones.filter(z => coverageFilter === "all" || z.coverage.toLowerCase() === coverageFilter),
-    [coverageFilter]
+    [zones, coverageFilter]
   );
 
   const mapMarkers = filteredZones.map(z => ({
     position: z.mapPosition,
     label: z.name,
     popup: `${z.totalVisits} visits · ${z.coverage} coverage · ${z.employees.length} employee${z.employees.length !== 1 ? "s" : ""}`,
-    color: (z.coverage === "High" ? "orange" : "green") as "orange" | "green",
+    color: (z.coverage === "High" ? "#ef4444" : z.coverage === "Medium" ? "#f97316" : "#22c55e") as any,
+  }));
+
+  const mapCircles = filteredZones.map(z => ({
+    position: z.mapPosition,
+    radius: z.radius || 500,
+    color: (z.coverage === "High" ? "#ef4444" : z.coverage === "Medium" ? "#f97316" : "#22c55e"),
+    fillOpacity: 0.2,
+    popup: `${z.name}: ${z.coverage} Activity`,
   }));
 
   // Unique employees across all zones
@@ -132,7 +87,7 @@ export default function HeatMapPage() {
     const emp = new Set<string>();
     zones.forEach(z => z.employees.forEach(e => emp.add(e.name)));
     return emp.size;
-  }, []);
+  }, [zones]);
 
   return (
     <div className="p-6 space-y-5">
@@ -204,8 +159,13 @@ export default function HeatMapPage() {
               <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-green-500" /> Med/Low</div>
             </div>
           </div>
-          <div className="h-96">
-            <Map center={[19.12, 72.87]} zoom={12} markers={mapMarkers} height="100%" />
+          <div className="h-96 relative">
+            {loading && (
+              <div className="absolute inset-0 z-10 bg-white/50 flex items-center justify-center backdrop-blur-[1px]">
+                <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
+              </div>
+            )}
+            <Map center={[19.12, 72.87]} zoom={11} markers={mapMarkers} circles={mapCircles} height="100%" />
           </div>
           <div className="px-4 py-2.5 bg-orange-50 border-t border-orange-100">
             <p className="text-xs text-orange-600 font-medium flex items-center gap-1.5">

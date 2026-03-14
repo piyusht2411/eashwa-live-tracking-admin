@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, User, Mail, Lock, Phone, Briefcase, Hash, MapPin, CreditCard, Calendar, UserCheck, ChevronDown, Loader2 } from "lucide-react";
+import { X, User, Mail, Lock, Phone, Briefcase, Hash, MapPin, CreditCard, Calendar, UserCheck, ChevronDown, Loader2, Upload } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/store";
 import { addEmployee } from "@/store/employeeSlice";
@@ -11,6 +11,7 @@ import { toast } from "sonner";
 interface Props {
   open: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
 interface AdminOrManager {
@@ -40,16 +41,24 @@ const initialForm: RegisterEmployeePayload & { joiningDate: string } = {
   joiningDate: "",
 };
 
-export default function AddEmployeeModal({ open, onClose }: Props) {
+export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
   const dispatch = useDispatch();
   const token = useSelector((s: RootState) => s.auth.authToken);
 
   const [form, setForm] = useState(initialForm);
+  const [profilePicFile, setProfilePicFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
   const [adminsAndManagers, setAdminsAndManagers] = useState<AdminOrManager[]>([]);
   const [fetchingManagers, setFetchingManagers] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   useEffect(() => {
     if (open) {
@@ -74,6 +83,15 @@ export default function AddEmployeeModal({ open, onClose }: Props) {
   const set = (key: keyof typeof form, value: string | number | null) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith("image/")) {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setProfilePicFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) {
@@ -97,7 +115,7 @@ export default function AddEmployeeModal({ open, onClose }: Props) {
         ...(form.joiningDate && { joiningDate: form.joiningDate }),
       };
 
-      const data = await registerEmployee(payload, token);
+      const data = await registerEmployee(payload, profilePicFile, token);
 
       dispatch(
         addEmployee({
@@ -114,11 +132,15 @@ export default function AddEmployeeModal({ open, onClose }: Props) {
           managedBy: data.user.managerId || null,
           isActive: true,
           joiningDate: form.joiningDate || new Date().toISOString(),
+          profilePicture: data.user.profilePicture || ""
         })
       );
 
       toast.success(`Employee "${form.name}" added successfully!`);
+      onSuccess?.();
       setForm(initialForm);
+      setProfilePicFile(null);
+      setPreviewUrl(null);
       setStep(1);
       onClose();
     } catch (err: unknown) {
@@ -159,11 +181,10 @@ export default function AddEmployeeModal({ open, onClose }: Props) {
             <button
               key={s.num}
               onClick={() => setStep(s.num as 1 | 2)}
-              className={`flex-1 py-3 text-sm font-semibold transition-colors ${
-                step === s.num
+              className={`flex-1 py-3 text-sm font-semibold transition-colors ${step === s.num
                   ? "text-orange-600 border-b-2 border-orange-500 bg-orange-50/50"
                   : "text-gray-400 hover:text-gray-600"
-              }`}
+                }`}
             >
               {s.num}. {s.label}
             </button>
@@ -175,6 +196,38 @@ export default function AddEmployeeModal({ open, onClose }: Props) {
           <div className="p-6 space-y-5">
             {step === 1 && (
               <>
+                <div className="flex flex-col items-center mb-8">
+                  <label className="cursor-pointer group">
+                    <div className="relative w-28 h-28 rounded-2xl overflow-hidden border-4 border-white shadow-xl bg-gray-100">
+                      {previewUrl ? (
+                        <img
+                          src={previewUrl}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                          <User className="h-12 w-12 text-gray-400" />
+                        </div>
+                      )}
+                      <div className="absolute bottom-2 right-2 bg-orange-500 text-white p-2.5 rounded-full shadow-lg group-hover:scale-110 transition-transform">
+                        <Upload className="h-4 w-4" />
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-3 text-center leading-tight">
+                      Click to upload profile picture<br />
+                      <span className="text-[10px]">(optional • JPG/PNG)</span>
+                    </p>
+
+                    {/* ← INPUT MUST BE INSIDE LABEL */}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleProfilePictureChange}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
                 {/* Name */}
                 <div>
                   <label className={labelClass}>Full Name *</label>

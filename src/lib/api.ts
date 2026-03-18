@@ -210,12 +210,16 @@ export async function getPerformance(token: string) {
   return data;
 }
 
-export async function getAnomalies(token: string) {
-  const res = await fetch(`${API_BASE}/anomalies`, {
+export async function getAlerts(token: string, query?: string) {
+  const url = query
+    ? `${API_BASE}/anomalies?${query}`
+    : `${API_BASE}/anomalies`;
+
+  const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.message || "Failed to fetch anomalies");
+  if (!res.ok) throw new Error(data.message || "Failed to fetch alerts");
   return data;
 }
 

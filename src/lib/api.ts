@@ -340,8 +340,28 @@ export async function getVisitRecords(token: string, params?: { employeeName?: s
   return data;
 }
 
-export async function getBreakRecords(token: string) {
-  const res = await fetch(`${API_BASE}/breaks/all`, {
+export async function getBreakRecords(
+  token: string,
+  params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    month?: string;
+  } = {}
+) {
+  const query = new URLSearchParams();
+  if (params.page) query.set("page", String(params.page));
+  if (params.limit) query.set("limit", String(params.limit));
+  if (params.search) query.set("search", params.search);
+  if (params.status && params.status !== "all") query.set("status", params.status);
+  if (params.startDate) query.set("startDate", params.startDate);
+  if (params.endDate) query.set("endDate", params.endDate);
+  if (params.month) query.set("month", params.month);
+
+  const res = await fetch(`${API_BASE}/breaks/all?${query.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();

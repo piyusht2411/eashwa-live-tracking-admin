@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { Coffee, Search, Loader2, Clock, ChevronDown, AlertTriangle } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import {
+  Coffee, Search, Loader2, Clock, ChevronDown, AlertTriangle,
+  ChevronLeft, ChevronRight,
+} from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 import { getBreakRecords } from "@/lib/api";
-import { toast } from "sonner";
+import { useDebounce } from "@/hooks/useDebounce";
 
 export interface BreakRecord {
   _id: string;
@@ -13,10 +16,20 @@ export interface BreakRecord {
   managerName?: string;
   breakStart: string;
   breakEnd?: string;
-  duration?: number; // minutes
-  location?: string;
+  duration?: number;
+  startLocation?: { lat: number; lng: number; address: string } | null;
+  endLocation?: { lat: number; lng: number; address: string } | null;
   status: "active" | "ended" | "overdue";
   date: string;
+}
+
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
 }
 
 const statusConfig: Record<string, { label: string; color: string; dot: string }> = {
@@ -25,50 +38,65 @@ const statusConfig: Record<string, { label: string; color: string; dot: string }
   overdue: { label: "Overdue", color: "bg-red-100 text-red-600", dot: "bg-red-500" },
 };
 
+const LIMIT = 20;
+
 export default function BreakMonitorPage() {
   const [records, setRecords] = useState<BreakRecord[]>([]);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
+
   const [search, setSearch] = useState("");
   const [monthFilter, setMonthFilter] = useState("");
-  const [dateFilter, setDateFilter] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
+
+  const debouncedSearch = useDebounce(search, 400);
   const token = useSelector((state: RootState) => state.auth.authToken);
 
-  useEffect(() => {
-    const fetchBreaks = async () => {
-      if (!token) return;
-      try {
-        setLoading(true);
-        const res = await getBreakRecords(token);
-        setRecords(res.data || []);
-      } catch {
-        setRecords([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchBreaks();
-  }, [token]);
-
-  const filtered = useMemo(() => records.filter(r => {
-    if (search && !r.employeeName.toLowerCase().includes(search.toLowerCase())) return false;
-    if (statusFilter !== "all" && r.status !== statusFilter) return false;
-    if (monthFilter) {
-      const d = new Date(r.date);
-      const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      if (m !== monthFilter) return false;
+  const fetchBreaks = useCallback(async () => {
+    if (!token) return;
+    try {
+      setLoading(true);
+      const res = await getBreakRecords(token, {
+        page,
+        limit: LIMIT,
+        search: debouncedSearch || undefined,
+        status: statusFilter !== "all" ? statusFilter : undefined,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        month: !startDate && !endDate && monthFilter ? monthFilter : undefined,
+      });
+      setRecords(res.data || []);
+      setPagination(res.pagination || null);
+    } catch {
+      setRecords([]);
+      setPagination(null);
+    } finally {
+      setLoading(false);
     }
-    if (dateFilter && r.date.slice(0, 10) !== dateFilter) return false;
-    return true;
-  }), [records, search, monthFilter, dateFilter, statusFilter]);
+  }, [token, page, debouncedSearch, statusFilter, startDate, endDate, monthFilter]);
 
-  const stats = useMemo(() => ({
-    active: records.filter(r => r.status === "active").length,
-    overdue: records.filter(r => r.status === "overdue").length,
-    avgDuration: records.filter(r => r.duration).length > 0
-      ? Math.round(records.filter(r => r.duration).reduce((s, r) => s + (r.duration || 0), 0) / records.filter(r => r.duration).length)
-      : 0,
-  }), [records]);
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter, startDate, endDate, monthFilter]);
+
+  useEffect(() => {
+    fetchBreaks();
+  }, [fetchBreaks]);
+
+  const clearFilters = () => {
+    setSearch("");
+    setMonthFilter("");
+    setStartDate("");
+    setEndDate("");
+    setStatusFilter("all");
+    setPage(1);
+  };
+
+  const hasFilters = search || monthFilter || startDate || endDate || statusFilter !== "all";
 
   const formatDuration = (min?: number) => {
     if (min == null) return "—";
@@ -81,6 +109,14 @@ export default function BreakMonitorPage() {
     return new Date(dateStr).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
+  const activeCount = records.filter(r => r.status === "active").length;
+  const overdueCount = records.filter(r => r.status === "overdue").length;
+  const avgDuration = (() => {
+    const withDur = records.filter(r => r.duration);
+    if (!withDur.length) return 0;
+    return Math.round(withDur.reduce((s, r) => s + (r.duration || 0), 0) / withDur.length);
+  })();
+
   return (
     <div className="p-6 space-y-5">
       {/* Header */}
@@ -92,9 +128,9 @@ export default function BreakMonitorPage() {
       {/* Summary Cards */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Currently On Break", value: stats.active, color: "bg-blue-50 border-blue-100 text-blue-600", icon: Coffee },
-          { label: "Overdue Breaks", value: stats.overdue, color: "bg-red-50 border-red-100 text-red-600", icon: AlertTriangle },
-          { label: "Avg Break Duration", value: `${stats.avgDuration} min`, color: "bg-orange-50 border-orange-100 text-orange-600", icon: Clock },
+          { label: "Currently On Break", value: activeCount, color: "bg-blue-50 border-blue-100 text-blue-600", icon: Coffee },
+          { label: "Overdue Breaks", value: overdueCount, color: "bg-red-50 border-red-100 text-red-600", icon: AlertTriangle },
+          { label: "Avg Break Duration", value: `${avgDuration} min`, color: "bg-orange-50 border-orange-100 text-orange-600", icon: Clock },
         ].map(s => {
           const Icon = s.icon;
           return (
@@ -110,11 +146,11 @@ export default function BreakMonitorPage() {
       </div>
 
       {/* Currently Active Breaks */}
-      {stats.active > 0 && (
+      {activeCount > 0 && (
         <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-            <p className="font-bold text-blue-800 text-sm">{stats.active} Employee{stats.active !== 1 ? "s" : ""} Currently On Break</p>
+            <p className="font-bold text-blue-800 text-sm">{activeCount} Employee{activeCount !== 1 ? "s" : ""} Currently On Break</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {records.filter(r => r.status === "active").map(r => (
@@ -145,15 +181,24 @@ export default function BreakMonitorPage() {
         <input
           type="month"
           value={monthFilter}
-          onChange={e => setMonthFilter(e.target.value)}
+          onChange={e => { setMonthFilter(e.target.value); setStartDate(""); setEndDate(""); }}
           className="px-3 py-2.5 text-sm rounded-xl border border-gray-200 focus:border-orange-400 outline-none bg-white font-medium text-gray-700"
         />
-        <input
-          type="date"
-          value={dateFilter}
-          onChange={e => setDateFilter(e.target.value)}
-          className="px-3 py-2.5 text-sm rounded-xl border border-gray-200 focus:border-orange-400 outline-none bg-white font-medium text-gray-700"
-        />
+        <div className="flex items-center gap-1.5">
+          <input
+            type="date"
+            value={startDate}
+            onChange={e => { setStartDate(e.target.value); setMonthFilter(""); }}
+            className="px-3 py-2.5 text-sm rounded-xl border border-gray-200 focus:border-orange-400 outline-none bg-white font-medium text-gray-700"
+          />
+          <span className="text-xs text-gray-400">to</span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={e => { setEndDate(e.target.value); setMonthFilter(""); }}
+            className="px-3 py-2.5 text-sm rounded-xl border border-gray-200 focus:border-orange-400 outline-none bg-white font-medium text-gray-700"
+          />
+        </div>
         <div className="relative">
           <select
             value={statusFilter}
@@ -167,9 +212,9 @@ export default function BreakMonitorPage() {
           </select>
           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
         </div>
-        {(search || monthFilter || dateFilter || statusFilter !== "all") && (
+        {hasFilters && (
           <button
-            onClick={() => { setSearch(""); setMonthFilter(""); setDateFilter(""); setStatusFilter("all"); }}
+            onClick={clearFilters}
             className="px-3 py-2.5 text-sm rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
           >
             Clear
@@ -183,7 +228,7 @@ export default function BreakMonitorPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/50">
-                {["Employee", "Manager", "Date", "Break Start", "Break End", "Duration", "Location", "Status"].map(h => (
+                {["Employee", "Manager", "Date", "Break Start", "Start Location", "Break End", "End Location", "Duration", "Status"].map(h => (
                   <th key={h} className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -191,20 +236,20 @@ export default function BreakMonitorPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center">
+                  <td colSpan={9} className="py-12 text-center">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-orange-400" />
                     <p className="text-sm text-gray-400">Loading break records...</p>
                   </td>
                 </tr>
-              ) : filtered.length === 0 ? (
+              ) : records.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center">
+                  <td colSpan={9} className="py-12 text-center">
                     <Coffee className="h-8 w-8 mx-auto mb-2 opacity-30 text-gray-400" />
                     <p className="text-sm font-semibold text-gray-700">No break records found</p>
                     <p className="text-xs text-gray-400">Employee break data will appear here once available.</p>
                   </td>
                 </tr>
-              ) : filtered.map(r => {
+              ) : records.map(r => {
                 const sc = statusConfig[r.status] || statusConfig.ended;
                 const isOverdue = r.status === "overdue";
                 return (
@@ -218,16 +263,27 @@ export default function BreakMonitorPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{r.managerName || "—"}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{new Date(r.date).toLocaleDateString()}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{formatTime(r.breakStart)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{r.breakEnd ? formatTime(r.breakEnd) : <span className="text-blue-500 text-xs font-medium">Ongoing</span>}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{new Date(r.date).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{formatTime(r.breakStart)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 max-w-[180px]">
+                      {r.startLocation?.address
+                        ? <span title={r.startLocation.address} className="block truncate">{r.startLocation.address}</span>
+                        : <span className="text-gray-400">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                      {r.breakEnd ? formatTime(r.breakEnd) : <span className="text-blue-500 text-xs font-medium">Ongoing</span>}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600 max-w-[180px]">
+                      {r.endLocation?.address
+                        ? <span title={r.endLocation.address} className="block truncate">{r.endLocation.address}</span>
+                        : <span className="text-gray-400">—</span>}
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`text-sm font-bold ${isOverdue ? "text-red-600" : "text-gray-700"}`}>
                         {formatDuration(r.duration)}
                       </span>
                       {isOverdue && <AlertTriangle className="h-3.5 w-3.5 text-red-500 inline ml-1" />}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">{r.location || "—"}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
                         <div className={`w-2 h-2 rounded-full ${sc.dot}`} />
@@ -240,8 +296,57 @@ export default function BreakMonitorPage() {
             </tbody>
           </table>
         </div>
-        <div className="px-5 py-3 border-t border-gray-100 text-xs text-gray-400">
-          Showing {filtered.length} of {records.length} break records
+
+        {/* Footer: count + pagination */}
+        <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
+          <p className="text-xs text-gray-400">
+            {pagination
+              ? `Showing ${(pagination.page - 1) * pagination.limit + 1}–${Math.min(pagination.page * pagination.limit, pagination.total)} of ${pagination.total} records`
+              : `${records.length} records`}
+          </p>
+          {pagination && pagination.pages > 1 && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(p => p - 1)}
+                disabled={!pagination.hasPrev || loading}
+                className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              {Array.from({ length: pagination.pages }, (_, i) => i + 1)
+                .filter(p => p === 1 || p === pagination.pages || Math.abs(p - page) <= 1)
+                .reduce<(number | "...")[]>((acc, p, idx, arr) => {
+                  if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("...");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  p === "..." ? (
+                    <span key={`ellipsis-${i}`} className="px-1.5 text-xs text-gray-400">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p as number)}
+                      disabled={loading}
+                      className={`min-w-[30px] h-[30px] text-xs rounded-lg border transition-colors ${
+                        page === p
+                          ? "bg-orange-500 border-orange-500 text-white font-bold"
+                          : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+              <button
+                onClick={() => setPage(p => p + 1)}
+                disabled={!pagination.hasNext || loading}
+                className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

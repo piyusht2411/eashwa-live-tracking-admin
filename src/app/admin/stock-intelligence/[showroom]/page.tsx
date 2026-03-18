@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, Package, MapPin, Calendar, ChevronDown, Loader2, User, Clock } from "lucide-react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 import { getStockSubmissions } from "@/lib/api";
@@ -18,8 +19,9 @@ interface StockSubmission {
   itemType?: string;
 }
 
-export default function ShowroomDetailPage({ params }: { params: { showroom: string } }) {
-  const showroomName = decodeURIComponent(params.showroom);
+export default function ShowroomDetailPage() {
+  const params = useParams();
+  const showroomName = decodeURIComponent(params.showroom as string);
   const [submissions, setSubmissions] = useState<StockSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [modelFilter, setModelFilter] = useState("all");
@@ -32,8 +34,19 @@ export default function ShowroomDetailPage({ params }: { params: { showroom: str
       try {
         setLoading(true);
         const res = await getStockSubmissions(token);
-        const all: StockSubmission[] = res.data || [];
-        setSubmissions(all.filter(s => s.showroom === showroomName));
+        const rawData: any[] = Array.isArray(res) ? res : (res.data || []);
+        const flattened: StockSubmission[] = rawData.flatMap((submission: any) =>
+          (submission.stock || []).map((stockItem: any) => ({
+            taskId: submission._id,
+            employee: submission.user?.name || "Unknown",
+            showroom: submission.showroomName || "Unknown",
+            date: submission.date || submission.createdAt,
+            item: stockItem.kind === "battery" ? stockItem.batteryType : stockItem.model,
+            qty: stockItem.kind === "battery" ? (stockItem.batteryQuantity ?? 0) : (stockItem.quantity ?? 0),
+            itemType: stockItem.kind,
+          }))
+        );
+        setSubmissions(flattened.filter(s => s.showroom === showroomName));
       } catch {
         toast.error("Failed to load stock data");
       } finally {
@@ -74,7 +87,7 @@ export default function ShowroomDetailPage({ params }: { params: { showroom: str
     : null;
 
   const totalQty = filtered.reduce((s, r) => s + r.qty, 0);
-  const totalBatteries = filtered.filter(s => s.item.toLowerCase().includes("battery") || s.item.toLowerCase().includes("bat")).reduce((s, r) => s + r.qty, 0);
+  const totalBatteries = filtered.filter(s => s.itemType === "battery").reduce((s, r) => s + r.qty, 0);
   const totalScooters = totalQty - totalBatteries;
 
   return (

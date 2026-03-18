@@ -1,4 +1,4 @@
-const API_BASE = "https://eahwa-live-trakcing-backend-pcma.vercel.app/api";
+const API_BASE = "http://localhost:5000/api";
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -311,6 +311,15 @@ export async function getEmployeeLocationHistory(token: string, userId: string) 
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || "Failed to fetch location history");
+  return data;
+}
+
+export async function getVisitById(token: string, id: string) {
+  const res = await fetch(`${API_BASE}/visit/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to fetch visit");
   return data;
 }
 

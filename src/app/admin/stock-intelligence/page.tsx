@@ -31,7 +31,19 @@ export default function StockIntelligencePage() {
       try {
         setLoading(true);
         const res = await getStockSubmissions(token);
-        setSubmissions(res.data || []);
+        const rawData: any[] = Array.isArray(res) ? res : (res.data || []);
+        const flattened: StockSubmission[] = rawData.flatMap((submission: any) =>
+          (submission.stock || []).map((stockItem: any) => ({
+            taskId: submission._id,
+            employee: submission.user?.name || "Unknown",
+            showroom: submission.showroomName || "Unknown",
+            date: submission.date || submission.createdAt,
+            item: stockItem.kind === "battery" ? stockItem.batteryType : stockItem.model,
+            qty: stockItem.kind === "battery" ? (stockItem.batteryQuantity ?? 0) : (stockItem.quantity ?? 0),
+            itemType: stockItem.kind,
+          }))
+        );
+        setSubmissions(flattened);
       } catch {
         toast.error("Failed to load stock data");
       } finally {

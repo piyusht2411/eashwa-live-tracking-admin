@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = "https://eahwa-live-trakcing-backend-pcma.vercel.app/api";
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -26,6 +26,9 @@ export interface RegisterEmployeePayload {
   aadhaarNumber?: number | null;
   managerId?: string;
   joiningDate?: string;
+  homeLat?: number
+  homeLng?: number
+  homeAddress?: string
 }
 
 export async function registerEmployee(
@@ -315,7 +318,7 @@ export async function getEmployeeLocationHistory(token: string, userId: string) 
 }
 
 export async function getVisitById(token: string, id: string) {
-  const res = await fetch(`${API_BASE}/visit/${id}`, {
+  const res = await fetch(`${API_BASE}/visits/${id}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();

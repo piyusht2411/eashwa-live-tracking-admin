@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calendar, CheckCircle2, XCircle, Clock, Download, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Calendar, CheckCircle2, XCircle, Clock, Download, ChevronLeft, ChevronRight, Loader2, Clock1, Clock10 } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 import { getAttendance } from "@/lib/api";
@@ -22,6 +22,7 @@ export interface AttendanceRecord {
   selfie?: string | null;
   isAutomatic?: boolean;
   reason?: string;
+  isLate?:boolean;
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
@@ -93,6 +94,7 @@ export default function AttendancePage() {
   // Extract unique employee names for filter
   const uniqueEmployees = ["All", ...Array.from(new Set(attendanceRecords.map((r) => r.user?.name).filter(Boolean)))];
 
+
   // Group to calculate stats simply initially
   const stats = {
     records: attendanceRecords.length,
@@ -149,13 +151,13 @@ export default function AttendancePage() {
         >
           {uniqueEmployees.map(e => <option key={e || "unknown"}>{e}</option>)}
         </select>
-        <button
+        {/* <button
           onClick={() => setAutoPunchOutOnly(v => !v)}
           className={`flex items-center gap-2 px-3 py-2.5 text-sm rounded-xl border font-medium transition-colors ${autoPunchOutOnly ? "bg-red-50 border-red-200 text-red-600" : "bg-white border-gray-200 text-gray-600 hover:border-red-200"}`}
         >
           <Clock className="h-4 w-4" />
           Auto Punch-Outs Only
-        </button>
+        </button> */}
         <div className="flex items-center gap-2 text-xs text-gray-500">
           <Calendar className="h-4 w-4 text-orange-400" />
           {dayLabel} records
@@ -168,7 +170,7 @@ export default function AttendancePage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/50">
-                {["Employee", "Emp ID", "Date", "Time", "Type", "Reason / Selfie", "Status"].map(h => (
+                {["Employee", "Emp ID", "Date", "Time", "Type", "Selfie", "Status"].map(h => (
                   <th key={h} className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">{h}</th>
                 ))}
               </tr>
@@ -182,62 +184,74 @@ export default function AttendancePage() {
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
-                 <tr>
-                   <td colSpan={6} className="text-center py-10 text-sm text-gray-400">
-                     No attendance records found for {dayLabel.toLowerCase()}.
-                   </td>
-                 </tr>
+                <tr>
+                  <td colSpan={6} className="text-center py-10 text-sm text-gray-400">
+                    No attendance records found for {dayLabel.toLowerCase()}.
+                  </td>
+                </tr>
               ) : (
-                 filtered.map((row) => {
-                   const uName = row.user?.name || "Unknown";
-                   const formatTime = new Date(row.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                   const formatDate = new Date(row.time).toLocaleDateString();
-                   const isPunchIn = row.type === "in";
-                   const isAuto = row.isAutomatic || row.selfie === null;
+                filtered.map((row) => {
+                  const uName = row.user?.name || "Unknown";
+                  const formatTime = new Date(row.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  const formatDate = new Date(row.time).toLocaleDateString();
+                  const isPunchIn = row.type === "in";
+                  const isAuto = row.isAutomatic || row.selfie === null;
 
-                   return (
-                     <tr key={row._id} className={`border-b border-gray-50 hover:bg-orange-50/20 transition-colors ${isAuto ? "bg-red-50/30" : ""}`}>
-                       <td className="px-4 py-3">
-                         <div className="flex items-center gap-2.5">
-                           <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 font-bold text-xs flex items-center justify-center flex-shrink-0 uppercase">
-                             {uName.slice(0, 2)}
-                           </div>
-                           <span className="text-sm font-semibold text-gray-800">{uName}</span>
-                         </div>
-                       </td>
-                       <td className="px-4 py-3 text-sm text-gray-500">{row.user?.employeeId || "—"}</td>
-                       <td className="px-4 py-3 text-sm text-gray-700">{formatDate}</td>
-                       <td className="px-4 py-3 text-sm text-gray-700 font-medium">{formatTime}</td>
-                       <td className="px-4 py-3">
-                         <div className="flex flex-col gap-1">
-                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full w-fit ${isPunchIn ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
-                             {isPunchIn ? "Punch In" : "Punch Out"}
-                           </span>
-                           {isAuto && (
-                             <span className="text-xs font-semibold px-2 py-0.5 rounded-full w-fit bg-red-100 text-red-600">
-                               Auto Punch-Out
-                             </span>
-                           )}
-                         </div>
-                       </td>
-                       <td className="px-4 py-3">
-                         {isAuto ? (
-                           <span className="text-xs text-red-500 font-medium">{row.reason || "Location sharing stopped"}</span>
-                         ) : row.selfie ? (
-                           <img src={row.selfie} alt="Selfie" className="w-8 h-8 rounded-full object-cover border border-gray-200" />
-                         ) : (
-                           <span className="text-xs text-gray-400">—</span>
-                         )}
-                       </td>
-                       <td className="px-4 py-3">
-                         <div className="flex items-center gap-1.5">
-                           <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                           <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-green-100 text-green-700">Present</span>
-                         </div>
-                       </td>
-                     </tr>
-                   );
-                 })
+                  return (
+                    <tr key={row._id} className={`border-b border-gray-50 hover:bg-orange-50/20 transition-colors ${isAuto ? "bg-red-50/30" : ""}`}>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 font-bold text-xs flex items-center justify-center flex-shrink-0 uppercase">
+                            {uName.slice(0, 2)}
+                          </div>
+                          <span className="text-sm font-semibold text-gray-800">{uName}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{row.user?.employeeId || "—"}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{formatDate}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700 font-medium">{formatTime}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full w-fit ${isPunchIn ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
+                            {isPunchIn ? "Punch In" : "Punch Out"}
+                          </span>
+                          {isAuto && (
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full w-fit bg-red-100 text-red-600">
+                              Auto Punch-Out
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {isAuto ? (
+                          <span className="text-xs text-red-500 font-medium">{row.reason || "Location sharing stopped"}</span>
+                        ) : row.selfie ? (
+                          <img src={row.selfie} alt="Selfie" className="w-8 h-8 rounded-full object-cover border border-gray-200" />
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          {row.isLate ? (
+                            <XCircle className="h-3.5 w-3.5 text-red-500" />
+                          ) : (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                          )}
+
+                          <span
+                            className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${row.isLate
+                                ? "bg-red-100 text-red-700"
+                                : "bg-green-100 text-green-700"
+                              }`}
+                          >
+                            {row.isLate ? "Late" : "On Time"}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

@@ -1,7 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, User, Mail, Lock, Phone, Briefcase, Hash, MapPin, CreditCard, Calendar, UserCheck, ChevronDown, Loader2, Upload } from "lucide-react";
+import {
+  X,
+  User,
+  Mail,
+  Lock,
+  Phone,
+  Briefcase,
+  Hash,
+  MapPin,
+  CreditCard,
+  Calendar,
+  UserCheck,
+  ChevronDown,
+  Loader2,
+  Upload,
+} from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/store";
 import { addEmployee } from "@/store/employeeSlice";
@@ -26,7 +41,13 @@ const ROLES = [
   { value: "admin", label: "Admin" },
 ];
 
-const initialForm: RegisterEmployeePayload & { joiningDate: string } = {
+// Extend initialForm with the new home fields
+const initialForm: Omit<RegisterEmployeePayload, "joiningDate" | "homeLat" | "homeLng" | "homeAddress"> & {
+  joiningDate: string;
+  homeLat: string;
+  homeLng: string;
+  homeAddress: string;
+} = {
   name: "",
   email: "",
   password: "",
@@ -39,6 +60,9 @@ const initialForm: RegisterEmployeePayload & { joiningDate: string } = {
   aadhaarNumber: null,
   managerId: "",
   joiningDate: "",
+  homeLat: "",
+  homeLng: "",
+  homeAddress: "",
 };
 
 export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
@@ -80,7 +104,7 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
 
   if (!open) return null;
 
-  const set = (key: keyof typeof form, value: string | number | null) =>
+  const updateForm = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
   const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,8 +122,27 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
       toast.error("Not authenticated");
       return;
     }
+
     setLoading(true);
+
     try {
+      // Build homeLocation object safely
+      const homeLocation: { lat?: number; lng?: number; address?: string } = {};
+
+      if (form.homeLat.trim()) {
+        const latNum = parseFloat(form.homeLat);
+        if (!isNaN(latNum)) homeLocation.lat = latNum;
+      }
+
+      if (form.homeLng.trim()) {
+        const lngNum = parseFloat(form.homeLng);
+        if (!isNaN(lngNum)) homeLocation.lng = lngNum;
+      }
+
+      if (form.homeAddress.trim()) {
+        homeLocation.address = form.homeAddress.trim();
+      }
+
       const payload: RegisterEmployeePayload = {
         name: form.name,
         email: form.email,
@@ -114,6 +157,13 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
         ...(form.managerId && { managerId: form.managerId }),
         ...(form.joiningDate && { joiningDate: form.joiningDate }),
       };
+
+      // Only add home fields if at least one is valid
+      if (homeLocation.lat !== undefined || homeLocation.lng !== undefined || homeLocation.address) {
+        if (homeLocation.lat !== undefined) payload.homeLat = homeLocation.lat;
+        if (homeLocation.lng !== undefined) payload.homeLng = homeLocation.lng;
+        if (homeLocation.address) payload.homeAddress = homeLocation.address;
+      }
 
       const data = await registerEmployee(payload, profilePicFile, token);
 
@@ -132,7 +182,7 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
           managedBy: data.user.managerId || null,
           isActive: true,
           joiningDate: form.joiningDate || new Date().toISOString(),
-          profilePicture: data.user.profilePicture || ""
+          profilePicture: data.user.profilePicture || "",
         })
       );
 
@@ -156,12 +206,9 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
 
   return (
     <>
-      {/* Backdrop */}
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" onClick={onClose} />
 
-      {/* Modal */}
       <div className="fixed inset-y-0 right-0 w-full max-w-xl bg-white z-50 shadow-2xl flex flex-col overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-orange-500 to-orange-600">
           <div>
             <h2 className="text-lg font-black text-white">Add New Employee</h2>
@@ -172,7 +219,6 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
           </button>
         </div>
 
-        {/* Step Tabs */}
         <div className="flex border-b border-gray-100">
           {[
             { num: 1, label: "Basic Info" },
@@ -181,17 +227,17 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
             <button
               key={s.num}
               onClick={() => setStep(s.num as 1 | 2)}
-              className={`flex-1 py-3 text-sm font-semibold transition-colors ${step === s.num
+              className={`flex-1 py-3 text-sm font-semibold transition-colors ${
+                step === s.num
                   ? "text-orange-600 border-b-2 border-orange-500 bg-orange-50/50"
                   : "text-gray-400 hover:text-gray-600"
-                }`}
+              }`}
             >
               {s.num}. {s.label}
             </button>
           ))}
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-5">
             {step === 1 && (
@@ -200,11 +246,7 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
                   <label className="cursor-pointer group">
                     <div className="relative w-28 h-28 rounded-2xl overflow-hidden border-4 border-white shadow-xl bg-gray-100">
                       {previewUrl ? (
-                        <img
-                          src={previewUrl}
-                          alt="Preview"
-                          className="w-full h-full object-cover"
-                        />
+                        <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-gray-100">
                           <User className="h-12 w-12 text-gray-400" />
@@ -215,11 +257,10 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
                       </div>
                     </div>
                     <p className="text-xs text-gray-500 mt-3 text-center leading-tight">
-                      Click to upload profile picture<br />
+                      Click to upload profile picture
+                      <br />
                       <span className="text-[10px]">(optional • JPG/PNG)</span>
                     </p>
-
-                    {/* ← INPUT MUST BE INSIDE LABEL */}
                     <input
                       type="file"
                       accept="image/*"
@@ -228,7 +269,7 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
                     />
                   </label>
                 </div>
-                {/* Name */}
+
                 <div>
                   <label className={labelClass}>Full Name *</label>
                   <div className="relative">
@@ -238,13 +279,12 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
                       required
                       placeholder="e.g. Amit Verma"
                       value={form.name}
-                      onChange={(e) => set("name", e.target.value)}
+                      onChange={(e) => updateForm("name", e.target.value)}
                       className={inputClass}
                     />
                   </div>
                 </div>
 
-                {/* Email */}
                 <div>
                   <label className={labelClass}>Email Address *</label>
                   <div className="relative">
@@ -254,13 +294,12 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
                       required
                       placeholder="employee@eashwa.in"
                       value={form.email}
-                      onChange={(e) => set("email", e.target.value)}
+                      onChange={(e) => updateForm("email", e.target.value)}
                       className={inputClass}
                     />
                   </div>
                 </div>
 
-                {/* Password */}
                 <div>
                   <label className={labelClass}>Password *</label>
                   <div className="relative">
@@ -270,7 +309,7 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
                       required
                       placeholder="Min 6 characters"
                       value={form.password}
-                      onChange={(e) => set("password", e.target.value)}
+                      onChange={(e) => updateForm("password", e.target.value)}
                       className={inputClass + " pr-16"}
                     />
                     <button
@@ -283,7 +322,6 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
                   </div>
                 </div>
 
-                {/* Phone */}
                 <div>
                   <label className={labelClass}>Phone Number *</label>
                   <div className="relative">
@@ -293,13 +331,12 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
                       required
                       placeholder="10-digit mobile number"
                       value={form.phone}
-                      onChange={(e) => set("phone", e.target.value)}
+                      onChange={(e) => updateForm("phone", e.target.value)}
                       className={inputClass}
                     />
                   </div>
                 </div>
 
-                {/* Role */}
                 <div>
                   <label className={labelClass}>Role *</label>
                   <div className="relative">
@@ -307,11 +344,15 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
                     <select
                       required
                       value={form.role}
-                      onChange={(e) => set("role", e.target.value as "admin" | "hr" | "manager" | "employee")}
+                      onChange={(e) =>
+                        updateForm("role", e.target.value as "admin" | "hr" | "manager" | "employee")
+                      }
                       className={inputClass + " appearance-none pr-8"}
                     >
                       {ROLES.map((r) => (
-                        <option key={r.value} value={r.value}>{r.label}</option>
+                        <option key={r.value} value={r.value}>
+                          {r.label}
+                        </option>
                       ))}
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
@@ -330,22 +371,22 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
 
             {step === 2 && (
               <>
-                {/* Employee ID */}
                 <div>
-                  <label className={labelClass}>Employee ID <span className="text-gray-400 normal-case font-normal">(auto-generated if left blank)</span></label>
+                  <label className={labelClass}>
+                    Employee ID <span className="text-gray-400 normal-case font-normal">(auto-generated if left blank)</span>
+                  </label>
                   <div className="relative">
                     <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <input
                       type="text"
                       placeholder="e.g. EMP001"
                       value={form.employeeId ?? ""}
-                      onChange={(e) => set("employeeId", e.target.value)}
+                      onChange={(e) => updateForm("employeeId", e.target.value)}
                       className={inputClass}
                     />
                   </div>
                 </div>
 
-                {/* Post / Designation */}
                 <div>
                   <label className={labelClass}>Post / Designation</label>
                   <div className="relative">
@@ -354,13 +395,12 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
                       type="text"
                       placeholder="e.g. Sales Executive"
                       value={form.post ?? ""}
-                      onChange={(e) => set("post", e.target.value)}
+                      onChange={(e) => updateForm("post", e.target.value)}
                       className={inputClass}
                     />
                   </div>
                 </div>
 
-                {/* Joining Date */}
                 <div>
                   <label className={labelClass}>Joining Date</label>
                   <div className="relative">
@@ -368,29 +408,32 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
                     <input
                       type="date"
                       value={form.joiningDate}
-                      onChange={(e) => set("joiningDate", e.target.value)}
+                      onChange={(e) => updateForm("joiningDate", e.target.value)}
                       className={inputClass}
                     />
                   </div>
                 </div>
 
-                {/* Manager */}
                 <div>
                   <label className={labelClass}>Manager (Optional)</label>
                   <div className="relative">
                     <UserCheck className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <select
                       value={form.managerId}
-                      onChange={(e) => set("managerId", e.target.value || "")}
+                      onChange={(e) => updateForm("managerId", e.target.value || "")}
                       className={inputClass + " appearance-none pr-8"}
                       disabled={fetchingManagers}
                     >
                       <option value="">Select a manager or admin</option>
                       {fetchingManagers ? (
-                        <option value="" disabled>Loading...</option>
+                        <option value="" disabled>
+                          Loading...
+                        </option>
                       ) : (
                         adminsAndManagers.map((mgr) => (
-                          <option key={mgr.id} value={mgr.id}>{mgr.name}</option>
+                          <option key={mgr.id} value={mgr.id}>
+                            {mgr.name}
+                          </option>
                         ))
                       )}
                     </select>
@@ -403,7 +446,6 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
                   )}
                 </div>
 
-                {/* Aadhaar */}
                 <div>
                   <label className={labelClass}>Aadhaar Number</label>
                   <div className="relative">
@@ -412,13 +454,14 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
                       type="number"
                       placeholder="12-digit Aadhaar number"
                       value={form.aadhaarNumber ?? ""}
-                      onChange={(e) => set("aadhaarNumber", e.target.value ? Number(e.target.value) : null)}
+                      onChange={(e) =>
+                        updateForm("aadhaarNumber", e.target.value ? Number(e.target.value) : null)
+                      }
                       className={inputClass}
                     />
                   </div>
                 </div>
 
-                {/* Address */}
                 <div>
                   <label className={labelClass}>Address</label>
                   <div className="relative">
@@ -427,13 +470,70 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
                       rows={3}
                       placeholder="Home address"
                       value={form.address ?? ""}
-                      onChange={(e) => set("address", e.target.value)}
+                      onChange={(e) => updateForm("address", e.target.value)}
                       className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none bg-gray-50 focus:bg-white transition-all resize-none"
                     />
                   </div>
                 </div>
 
-                <div className="flex gap-3">
+                {/* ──────────────────────────────────────────────── */}
+                {/*                Home Location Section                 */}
+                {/* ──────────────────────────────────────────────── */}
+                <div className="pt-4 border-t border-gray-200">
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    Home Location <span className="text-gray-400 text-xs font-normal">(for accurate attendance / geofencing)</span>
+                  </label>
+
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className={labelClass}>Latitude</label>
+                      <div className="relative">
+                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="e.g. 28.7041"
+                          value={form.homeLat}
+                          onChange={(e) => updateForm("homeLat", e.target.value)}
+                          className={inputClass}
+                        />
+                      </div>
+                      <p className="text-[10px] text-gray-500 mt-1">Required for correct location</p>
+                    </div>
+
+                    <div>
+                      <label className={labelClass}>Longitude</label>
+                      <div className="relative">
+                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="e.g. 77.1025"
+                          value={form.homeLng}
+                          onChange={(e) => updateForm("homeLng", e.target.value)}
+                          className={inputClass}
+                        />
+                      </div>
+                      <p className="text-[10px] text-gray-500 mt-1">Required for correct location</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Home Address (optional)</label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
+                      <textarea
+                        rows={2}
+                        placeholder="e.g. 123 Main Street, Delhi"
+                        value={form.homeAddress}
+                        onChange={(e) => updateForm("homeAddress", e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none bg-gray-50 focus:bg-white transition-all resize-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4">
                   <button
                     type="button"
                     onClick={() => setStep(1)}
@@ -441,6 +541,7 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
                   >
                     ← Back
                   </button>
+
                   <button
                     type="submit"
                     disabled={loading}

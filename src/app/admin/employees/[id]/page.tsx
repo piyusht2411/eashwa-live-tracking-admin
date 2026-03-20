@@ -9,17 +9,11 @@ import {
 import dynamic from "next/dynamic";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
-import { getEmployeeById, getEmployeeLocationHistory, getStockSubmissions } from "@/lib/api";
+import { getEmployeeById, getEmployeeLocationHistory, getVisitRecords, getEmployeePerformance, getEmployeeStock } from "@/lib/api";
 import { toast } from "sonner";
 
 const Map = dynamic(() => import("@/components/LiveMap"), { ssr: false });
 
-const radarData = [
-  { subject: "Attendance", A: 95 }, { subject: "Punctuality", A: 88 },
-  { subject: "Visits", A: 90 }, { subject: "Productive", A: 85 },
-  { subject: "Distance", A: 80 }, { subject: "Tasks", A: 96 },
-  { subject: "Breaks", A: 92 }, { subject: "Stock", A: 88 },
-];
 
 const weekData = [
   { day: "Mon", productive: 6.2, idle: 1.3, break: 1.5 },
@@ -42,14 +36,15 @@ interface LocationRecord {
 
 interface StockSubmission {
   taskId: string;
-  employee: string;
   showroom: string;
+  address: string;
   date: string;
+  itemType: string;
   item: string;
   qty: number;
 }
 
-type TabType = "tracking" | "performance" | "hours" | "stock" | "same-location";
+type TabType = "tracking" | "performance" | "stock";
 
 export default function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -58,6 +53,10 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
   const [loading, setLoading] = useState(true);
   const [locationRecords, setLocationRecords] = useState<LocationRecord[]>([]);
   const [stockRecords, setStockRecords] = useState<StockSubmission[]>([]);
+  const [routePoints, setRoutePoints] = useState<[number, number][]>([]);
+  const [routeTotalDistance, setRouteTotalDistance] = useState<number>(0);
+  const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
+  const [performance, setPerformance] = useState<Record<string, number> | null>(null);
   const [locLoading, setLocLoading] = useState(false);
   const [monthFilter, setMonthFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
@@ -84,45 +83,80 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
     fetchEmp();
   }, [token, id]);
 
-// Replace this entire useEffect with the one below
-useEffect(() => {
-  if (tab !== "tracking" && tab !== "same-location") return;
-
-  const fetchLoc = async () => {
+  // Fetch route on mount (for map center + polyline)
+  useEffect(() => {
     if (!token || !id) return;
-    try {
-      setLocLoading(true);
-      const res = await getEmployeeLocationHistory(token, id);
+    const fetchRoute = async () => {
+      try {
+        const res = await getEmployeeLocationHistory(token, id);
+        const route: { lat: number; lng: number; distance: number }[] = res?.data?.route ?? [];
+        const pts: [number, number][] = route.map(p => [p.lat, p.lng]);
+        setRoutePoints(pts);
+        setRouteTotalDistance(route.reduce((sum, p) => sum + (p.distance || 0), 0));
+        if (pts.length > 0) setMapCenter(pts[pts.length - 1]);
+      } catch {
+        // silently ignore
+      }
+    };
+    fetchRoute();
+  }, [token, id]);
 
-      // ← THIS IS THE FIX: always ensure it's an array
-      const rawData = res?.data ?? res ?? [];
-      setLocationRecords(Array.isArray(rawData) ? rawData : []);
+  // Fetch performance data
+  useEffect(() => {
+    if (!token || !id) return;
+    getEmployeePerformance(token, id)
+      .then(res => setPerformance(res.data ?? res))
+      .catch(() => {});
+  }, [token, id]);
 
-    } catch {
-      // Silently handle – may not have data yet
-      setLocationRecords([]);   // ← extra safety
-    } finally {
-      setLocLoading(false);
-    }
-  };
-  fetchLoc();
-}, [tab, token, id]);
+  // Fetch visit records for tracking table
+  useEffect(() => {
+    if (tab !== "tracking") return;
+    if (!token || !emp) return;
+
+    const fetchVisits = async () => {
+      try {
+        setLocLoading(true);
+        const res = await getVisitRecords(token, { employeeName: emp.name });
+        const visits: any[] = res?.data ?? [];
+        setLocationRecords(visits.map(v => ({
+          _id: v._id,
+          date: v.visitDate,
+          time: v.visitTime,
+          showroomName: v.showroomName,
+          location: v.address,
+          distance: v.distance,
+          timeSpent: v.timeSpent,
+        })));
+      } catch {
+        setLocationRecords([]);
+      } finally {
+        setLocLoading(false);
+      }
+    };
+    fetchVisits();
+  }, [tab, token, emp]);
 
   useEffect(() => {
-    if (tab !== "stock") return;
+    if (tab !== "stock" || !token || !id) return;
     const fetchStock = async () => {
-      if (!token) return;
       try {
-        const res = await getStockSubmissions(token);
-        const all: StockSubmission[] = res.data || [];
-        // Filter to this employee only
-        setStockRecords(all.filter(s => s.employee === emp?.name));
+        let start: string | undefined;
+        let end: string | undefined;
+        if (stockMonthFilter) {
+          const [y, m] = stockMonthFilter.split("-");
+          const last = new Date(+y, +m, 0).getDate();
+          start = `${stockMonthFilter}-01`;
+          end = `${stockMonthFilter}-${last}`;
+        }
+        const res = await getEmployeeStock(token, id, start, end);
+        setStockRecords(res.data ?? []);
       } catch {
         // Silently handle
       }
     };
-    if (emp) fetchStock();
-  }, [tab, token, emp]);
+    fetchStock();
+  }, [tab, token, id, stockMonthFilter]);
 
   // Filter location records
   const filteredLocations = useMemo(() => locationRecords.filter(r => {
@@ -150,28 +184,41 @@ useEffect(() => {
     [locationCounts]
   );
 
+  function formatToLocalDateTime(utcString?: string | null): string {
+    if (!utcString) return "—";
+
+    const date = new Date(utcString);
+    if (isNaN(date.getTime())) return "—";
+
+    return date.toLocaleString("en-IN", {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    });
+  }
+
   const displayedLocations = repeatFilter
     ? filteredLocations.filter(r => locationCounts[r.showroomName || r.location] > 1)
     : filteredLocations;
 
-  // Summary metrics (calculated from filtered records)
+  // Summary metrics — distance from route API (GPS-accurate), visits/hours from visit records
   const summaryMetrics = useMemo(() => ({
     visits: filteredLocations.length,
-    distance: filteredLocations.reduce((s, r) => s + (r.distance || 0), 0).toFixed(1),
+    distance: routeTotalDistance.toFixed(2),
     hours: (filteredLocations.reduce((s, r) => s + (r.timeSpent || 0), 0) / 60).toFixed(1),
-  }), [filteredLocations]);
+  }), [filteredLocations, routeTotalDistance]);
 
   // Stock filters
   const stockModels = useMemo(() => [...new Set(stockRecords.map(s => s.item))].sort(), [stockRecords]);
-  const filteredStock = useMemo(() => stockRecords.filter(s => {
-    if (stockModelFilter !== "all" && s.item !== stockModelFilter) return false;
-    if (stockMonthFilter) {
-      const d = new Date(s.date);
-      const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      if (m !== stockMonthFilter) return false;
-    }
-    return true;
-  }), [stockRecords, stockModelFilter, stockMonthFilter]);
+  // Month filter is applied server-side; only model filter is applied client-side
+  const filteredStock = useMemo(() =>
+    stockModelFilter === "all" ? stockRecords : stockRecords.filter(s => s.item === stockModelFilter),
+    [stockRecords, stockModelFilter]
+  );
 
   const exportToExcel = (withFilters: boolean) => {
     const data = withFilters ? displayedLocations : locationRecords;
@@ -215,17 +262,16 @@ useEffect(() => {
 
   const currentStatus = emp.isActive ? "Active" : "Inactive";
   const managerName = emp.managedBy?.name || "Unassigned";
-  const punchInTime = emp.punchIn || "—";
-  const mockScore = emp.score || 85;
+  const punchInTime = emp.punchInTime || "—";
+  const punchOutTime = emp.punchOutTime || "—";
+  const mockScore = performance?.score ?? emp.score ?? "—";
   const mockLocation = emp.location || "Office";
-  const mapCenter = emp.currentLocation || [19.1300, 72.8600];
+  const resolvedMapCenter: [number, number] = mapCenter ?? emp.currentLocation ?? [29.9352, 77.5666];
 
   const tabs: { key: TabType; label: string }[] = [
-    { key: "tracking", label: "Location Tracking" },
+    { key: "tracking", label: "Visits" },
     { key: "performance", label: "Performance" },
-    { key: "hours", label: "Weekly Hours" },
     { key: "stock", label: "Stock Details" },
-    { key: "same-location", label: "Same Location" },
   ];
 
   return (
@@ -270,7 +316,8 @@ useEffect(() => {
               { icon: MapPin, label: mockLocation },
               { icon: Briefcase, label: "Sales" },
               { icon: Shield, label: `Manager: ${managerName}` },
-              { icon: Clock, label: `Punched in: ${punchInTime}` },
+              { icon: Clock, label: `Punched in: ${formatToLocalDateTime(punchInTime)}` },
+              { icon: Clock, label: `Punched out: ${formatToLocalDateTime(punchOutTime)}` },
             ].map(({ icon: Icon, label }, idx) => (
               <div key={idx} className="flex items-center gap-2.5 text-gray-600">
                 <Icon className="h-3.5 w-3.5 text-orange-400 flex-shrink-0" />
@@ -303,7 +350,7 @@ useEffect(() => {
             <span className="text-xs text-gray-400">Live · Updated just now</span>
           </div>
           <div className="h-64">
-            <Map center={mapCenter} markers={[{ position: mapCenter, label: emp.name, color: "orange" }]} />
+            <Map center={resolvedMapCenter} markers={[{ position: resolvedMapCenter, label: emp.name, color: "orange" }]} route={routePoints} />
           </div>
         </div>
       </div>
@@ -315,11 +362,10 @@ useEffect(() => {
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`flex-shrink-0 px-4 py-3 text-sm font-semibold transition-all ${
-                tab === t.key
-                  ? "text-orange-600 border-b-2 border-orange-500 bg-orange-50/50"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
+              className={`flex-shrink-0 px-4 py-3 text-sm font-semibold transition-all ${tab === t.key
+                ? "text-orange-600 border-b-2 border-orange-500 bg-orange-50/50"
+                : "text-gray-500 hover:text-gray-700"
+                }`}
             >
               {t.label}
             </button>
@@ -422,28 +468,46 @@ useEffect(() => {
 
           {/* PERFORMANCE TAB */}
           {tab === "performance" && (
-            <ResponsiveContainer width="100%" height={280}>
-              <RadarChart data={radarData}>
-                <PolarGrid stroke="#f3f4f6" />
-                <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11 }} />
-                <Radar dataKey="A" stroke="#f97316" fill="#f97316" fillOpacity={0.15} strokeWidth={2} />
-              </RadarChart>
-            </ResponsiveContainer>
-          )}
-
-          {/* WEEKLY HOURS TAB */}
-          {tab === "hours" && (
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={weekData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis dataKey="day" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ borderRadius: 10, border: "none" }} />
-                <Bar dataKey="productive" fill="#f97316" name="Productive" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="break" fill="#fbbf24" name="Break" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="idle" fill="#e5e7eb" name="Idle" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="space-y-4">
+              {performance ? (
+                <>
+                  <div className="grid grid-cols-4 gap-3">
+                    {[
+                      { label: "Overall Score", value: performance.score },
+                      { label: "Attendance", value: performance.attendance },
+                      { label: "Punctuality", value: performance.punctuality },
+                      { label: "Stock Updates", value: performance.stock },
+                    ].map(s => (
+                      <div key={s.label} className="bg-orange-50 border border-orange-100 rounded-xl p-3 text-center">
+                        <p className="text-xl font-black text-orange-600">{s.value ?? "—"}</p>
+                        <p className="text-xs text-orange-400 mt-0.5">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <RadarChart data={[
+                      { subject: "Attendance", A: performance.attendance },
+                      { subject: "Punctuality", A: performance.punctuality },
+                      { subject: "Visits", A: performance.visits },
+                      { subject: "Productive", A: performance.productive },
+                      { subject: "Distance", A: performance.distance },
+                      { subject: "Tasks", A: performance.tasks },
+                      { subject: "Breaks", A: performance.breaks },
+                      { subject: "Stock", A: performance.stock },
+                    ]}>
+                      <PolarGrid stroke="#f3f4f6" />
+                      <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11 }} />
+                      <Radar dataKey="A" stroke="#f97316" fill="#f97316" fillOpacity={0.15} strokeWidth={2} />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </>
+              ) : (
+                <div className="py-16 flex items-center justify-center text-gray-400">
+                  <Loader2 className="h-6 w-6 animate-spin text-orange-400 mr-2" />
+                  Loading performance data...
+                </div>
+              )}
+            </div>
           )}
 
           {/* STOCK DETAILS TAB */}
@@ -511,47 +575,6 @@ useEffect(() => {
                   </tbody>
                 </table>
               </div>
-            </div>
-          )}
-
-          {/* SAME LOCATION TAB */}
-          {tab === "same-location" && (
-            <div className="space-y-3">
-              <p className="text-sm text-gray-500">Locations visited more than once by this employee.</p>
-              {locLoading ? (
-                <div className="py-10 flex items-center justify-center text-gray-400">
-                  <Loader2 className="h-6 w-6 animate-spin text-orange-400" />
-                </div>
-              ) : repeatedLocations.length === 0 ? (
-                <div className="py-10 text-center text-sm text-gray-400">No repeated location activity found.</div>
-              ) : (
-                <div className="rounded-xl border border-gray-100 overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr className="border-b border-gray-100">
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Location Name</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Number of Visits</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {repeatedLocations.map(([loc, count]) => (
-                        <tr key={loc} className="border-b border-gray-50 hover:bg-orange-50/20 transition-colors">
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-3.5 w-3.5 text-orange-400 flex-shrink-0" />
-                              <span className="text-sm font-medium text-gray-800">{loc}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="text-sm font-black text-orange-600">{count}</span>
-                            <span className="text-xs text-gray-400 ml-1">visits</span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
             </div>
           )}
         </div>

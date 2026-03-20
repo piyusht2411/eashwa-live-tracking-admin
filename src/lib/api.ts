@@ -1,4 +1,4 @@
-const API_BASE = "https://eahwa-live-trakcing-backend-pcma.vercel.app/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -91,6 +91,27 @@ export async function getEmployeeById(token: string, id: string) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || "Failed to fetch employee");
+  return data;
+}
+
+export async function getEmployeeStock(token: string, id: string, start?: string, end?: string) {
+  const q = new URLSearchParams();
+  if (start) q.set("start", start);
+  if (end) q.set("end", end);
+  const res = await fetch(`${API_BASE}/admin/employees/${id}/stock?${q}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to fetch stock");
+  return data;
+}
+
+export async function getEmployeePerformance(token: string, id: string) {
+  const res = await fetch(`${API_BASE}/admin/employees/${id}/performance`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to fetch performance");
   return data;
 }
 

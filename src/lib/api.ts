@@ -156,10 +156,9 @@ export async function getLocationHistory(token: string, userId: string, date?: s
 
 // ─── Attendance & Leave ──────────────────────────────────────────────────────
 
-export async function getAttendance(token: string, date?: string) {
-  const url = date
-    ? `${API_BASE}/attendance?date=${date}`
-    : `${API_BASE}/attendance`;
+export async function getAttendance(token: string, params: Record<string, string> = {}) {
+  const qs = new URLSearchParams(params).toString();
+  const url = `${API_BASE}/attendance${qs ? `?${qs}` : ""}`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });

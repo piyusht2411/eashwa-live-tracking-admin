@@ -54,6 +54,10 @@ export async function registerEmployee(
   if (payload.managerId) formData.append("managerId", payload.managerId);
   if (payload.joiningDate) formData.append("joiningDate", payload.joiningDate);
 
+  if (payload.homeLat !== undefined) formData.append("homeLat", payload.homeLat.toFixed(7));
+  if (payload.homeLng !== undefined) formData.append("homeLng", payload.homeLng.toFixed(7));
+  if (payload.homeAddress) formData.append("homeAddress", payload.homeAddress);
+
   if (profilePictureFile) {
     formData.append("profilePicture", profilePictureFile);
   }
@@ -284,12 +288,18 @@ export async function updateGeofence(token: string, id: string, payload: any) {
   return data;
 }
 
-export async function getStockSubmissions(token: string, start?: string, end?: string) {
-  const params = new URLSearchParams();
-  if (start) params.set("start", start);
-  if (end) params.set("end", end);
+export async function getStockSubmissions(
+  token: string,
+  params?: { year?: number; month?: number; date?: string; page?: number; limit?: number }
+) {
+  const q = new URLSearchParams();
+  if (params?.year) q.set("year", String(params.year));
+  if (params?.month) q.set("month", String(params.month));
+  if (params?.date) q.set("date", params.date);
+  if (params?.page) q.set("page", String(params.page));
+  if (params?.limit) q.set("limit", String(params.limit));
 
-  const res = await fetch(`${API_BASE}/stock?${params}`, {
+  const res = await fetch(`${API_BASE}/stock?${q}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
@@ -416,19 +426,23 @@ export async function updateEmployee(
     const formData = new FormData();
     Object.entries(payload).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
-        formData.append(key, String(value));
+        if (key === "homeLocation" && typeof value === "object") {
+          // Nested object can't be sent as-is in FormData — serialize as JSON string
+          formData.append(key, JSON.stringify(value));
+        } else {
+          formData.append(key, String(value));
+        }
       }
     });
     formData.append("profilePicture", profilePictureFile);
     body = formData;
-    // browser automatically sets multipart/form-data
   } else {
     headers["Content-Type"] = "application/json";
     body = JSON.stringify(payload);
   }
 
-  const res = await fetch(`${API_BASE}/employees/${id}`, {
-    method: "PATCH",           // backend handles both PUT and PATCH
+  const res = await fetch(`${API_BASE}/users/${id}`, {
+    method: "PUT",           // backend handles both PUT and PATCH
     headers,
     body,
   });
@@ -439,7 +453,7 @@ export async function updateEmployee(
 
 // NEW: Delete (soft delete)
 export async function deleteEmployee(token: string, id: string) {
-  const res = await fetch(`${API_BASE}/employees/${id}`, {
+  const res = await fetch(`${API_BASE}/users/${id}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -447,6 +461,17 @@ export async function deleteEmployee(token: string, id: string) {
   if (!res.ok) throw new Error(data.message || "Failed to delete employee");
   return data;
 }
+export async function getHomeLocations(token: string, roles?: string[]) {
+  const q = new URLSearchParams();
+  if (roles && roles.length > 0) q.set("roles", roles.join(","));
+  const res = await fetch(`${API_BASE}/users/home-locations?${q}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to fetch home locations");
+  return data;
+}
+
 export async function getHeatmapData(token: string, period = "today") {
   const res = await fetch(`${API_BASE}/heatmap?period=${period}`, {
     headers: { Authorization: `Bearer ${token}` },

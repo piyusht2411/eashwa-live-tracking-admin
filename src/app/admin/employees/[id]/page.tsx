@@ -54,7 +54,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
   const [locationRecords, setLocationRecords] = useState<LocationRecord[]>([]);
   const [stockRecords, setStockRecords] = useState<StockSubmission[]>([]);
   const [routePoints, setRoutePoints] = useState<[number, number][]>([]);
-  const [routeTotalDistance, setRouteTotalDistance] = useState<number>(0);
+
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
   const [performance, setPerformance] = useState<Record<string, number> | null>(null);
   const [locLoading, setLocLoading] = useState(false);
@@ -92,8 +92,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
         const route: { lat: number; lng: number; distance: number }[] = res?.data?.route ?? [];
         const pts: [number, number][] = route.map(p => [p.lat, p.lng]);
         setRoutePoints(pts);
-        setRouteTotalDistance(route.reduce((sum, p) => sum + (p.distance || 0), 0));
-        if (pts.length > 0) setMapCenter(pts[pts.length - 1]);
+if (pts.length > 0) setMapCenter(pts[pts.length - 1]);
       } catch {
         // silently ignore
       }
@@ -208,9 +207,9 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
   // Summary metrics — distance from route API (GPS-accurate), visits/hours from visit records
   const summaryMetrics = useMemo(() => ({
     visits: filteredLocations.length,
-    distance: routeTotalDistance.toFixed(2),
+    distance: filteredLocations.reduce((s, r) => s + (r.distance || 0), 0).toFixed(2),
     hours: (filteredLocations.reduce((s, r) => s + (r.timeSpent || 0), 0) / 60).toFixed(1),
-  }), [filteredLocations, routeTotalDistance]);
+  }), [filteredLocations]);
 
   // Stock filters
   const stockModels = useMemo(() => [...new Set(stockRecords.map(s => s.item))].sort(), [stockRecords]);

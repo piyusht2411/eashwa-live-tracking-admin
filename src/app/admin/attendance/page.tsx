@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import * as XLSX from "xlsx";
 import { Calendar, CheckCircle2, XCircle, Clock, Download, ChevronLeft, ChevronRight, Loader2, Clock1, Clock10 } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
@@ -95,6 +96,24 @@ export default function AttendancePage() {
   const uniqueEmployees = ["All", ...Array.from(new Set(attendanceRecords.map((r) => r.user?.name).filter(Boolean)))];
 
 
+  const exportToExcel = () => {
+    const rows = filtered.map((r) => ({
+      Employee: r.user?.name || "Unknown",
+      "Emp ID": r.user?.employeeId || "—",
+      Department: r.user?.department || "—",
+      Date: new Date(r.time).toLocaleDateString(),
+      Time: new Date(r.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      Type: r.type === "in" ? "Punch In" : "Punch Out",
+      "Auto Punch-Out": r.isAutomatic || r.selfie === null ? "Yes" : "No",
+      Status: r.isLate ? "Late" : "On Time",
+      Reason: r.reason || "—",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+    XLSX.writeFile(wb, `attendance_${toDateString(currentDate)}.xlsx`);
+  };
+
   // Group to calculate stats simply initially
   const stats = {
     records: attendanceRecords.length,
@@ -111,7 +130,7 @@ export default function AttendancePage() {
           <h1 className="text-2xl font-black text-gray-800">Attendance</h1>
           <p className="text-sm text-gray-500">Punch In / Out records and attendance tracking</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-xl font-semibold text-sm hover:bg-orange-600 transition-colors">
+        <button onClick={exportToExcel} className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-xl font-semibold text-sm hover:bg-orange-600 transition-colors">
           <Download className="h-4 w-4" /> Export Excel
         </button>
       </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Package, MapPin, Calendar, Search, ChevronRight, Loader2, User } from "lucide-react";
+import { Package, MapPin, Calendar, Search, ChevronRight, ChevronLeft, Loader2, User } from "lucide-react";
 import Link from "next/link";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
@@ -18,11 +18,19 @@ export interface StockSubmission {
   itemType?: "scooter" | "battery" | string;
 }
 
+const CARDS_PER_PAGE = 9;
+
+const currentYearMonth = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+};
+
 export default function StockIntelligencePage() {
   const [submissions, setSubmissions] = useState<StockSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [monthFilter, setMonthFilter] = useState("");
+  const [monthFilter, setMonthFilter] = useState(currentYearMonth);
+  const [cardPage, setCardPage] = useState(1);
   const token = useSelector((state: RootState) => state.auth.authToken);
 
   useEffect(() => {
@@ -30,7 +38,19 @@ export default function StockIntelligencePage() {
       if (!token) return;
       try {
         setLoading(true);
-        const res = await getStockSubmissions(token);
+        setCardPage(1);
+
+        // Parse year/month from "YYYY-MM" string
+        let year: number | undefined;
+        let month: number | undefined;
+        if (monthFilter) {
+          const [y, m] = monthFilter.split("-").map(Number);
+          year = y;
+          month = m;
+        }
+
+        // Fetch all matching records (large limit so we get full data for showroom aggregation)
+        const res = await getStockSubmissions(token, { year, month, limit: 1000 });
         const rawData: any[] = Array.isArray(res) ? res : (res.data || []);
         const flattened: StockSubmission[] = rawData.flatMap((submission: any) =>
           (submission.stock || []).map((stockItem: any) => ({
@@ -51,7 +71,7 @@ export default function StockIntelligencePage() {
       }
     };
     fetchStock();
-  }, [token]);
+  }, [token, monthFilter]);
 
   // Aggregate by showroom
   const showroomData = useMemo(() => {
@@ -79,14 +99,12 @@ export default function StockIntelligencePage() {
       }
       map[sub.showroom].totalStock += sub.qty;
       map[sub.showroom].submissions.push(sub);
-      // Determine type by item name heuristic or itemType field
-      const isBattery = (sub.itemType === "battery") || sub.item.toLowerCase().includes("battery") || sub.item.toLowerCase().includes("bat");
+      const isBattery = (sub.itemType === "battery") || sub.item?.toLowerCase().includes("battery") || sub.item?.toLowerCase().includes("bat");
       if (isBattery) {
         map[sub.showroom].batteries += sub.qty;
       } else {
         map[sub.showroom].scooters += sub.qty;
       }
-      // Track most recent update
       if (new Date(sub.date) >= new Date(map[sub.showroom].lastDate)) {
         map[sub.showroom].lastExecutive = sub.employee;
         map[sub.showroom].lastDate = sub.date;
@@ -96,16 +114,15 @@ export default function StockIntelligencePage() {
     return Object.values(map).sort((a, b) => b.totalStock - a.totalStock);
   }, [submissions]);
 
-  // Filter showrooms
+  // Client-side search filter on aggregated showroom data
   const filtered = useMemo(() => showroomData.filter(s => {
-    if (search && !s.lastExecutive.toLowerCase().includes(search.toLowerCase())) return false;
-    if (monthFilter) {
-      const d = new Date(s.lastDate);
-      const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      if (m !== monthFilter) return false;
-    }
+    if (search && !s.showroom.toLowerCase().includes(search.toLowerCase()) && !s.lastExecutive.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
-  }), [showroomData, search, monthFilter]);
+  }), [showroomData, search]);
+
+  // Pagination
+  const totalPages = Math.ceil(filtered.length / CARDS_PER_PAGE);
+  const paginated = filtered.slice((cardPage - 1) * CARDS_PER_PAGE, cardPage * CARDS_PER_PAGE);
 
   const totalScooters = showroomData.reduce((s, r) => s + r.scooters, 0);
   const totalBatteries = showroomData.reduce((s, r) => s + r.batteries, 0);
@@ -122,7 +139,7 @@ export default function StockIntelligencePage() {
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: "Total Showrooms", value: showroomData.length, color: "bg-blue-50 border-blue-100 text-blue-600" },
-          { label: "Total Scooters", value: totalScooters, color: "bg-orange-50 border-orange-100 text-orange-600" },
+          { label: "Total Vehicle", value: totalScooters, color: "bg-orange-50 border-orange-100 text-orange-600" },
           { label: "Total Batteries", value: totalBatteries, color: "bg-green-50 border-green-100 text-green-600" },
         ].map(s => (
           <div key={s.label} className={`rounded-2xl border p-4 ${s.color}`}>
@@ -138,9 +155,9 @@ export default function StockIntelligencePage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by executive name..."
+            placeholder="Search by showroom or executive..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => { setSearch(e.target.value); setCardPage(1); }}
             className="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none bg-white"
           />
         </div>
@@ -150,9 +167,9 @@ export default function StockIntelligencePage() {
           onChange={e => setMonthFilter(e.target.value)}
           className="px-3 py-2.5 text-sm rounded-xl border border-gray-200 focus:border-orange-400 outline-none bg-white font-medium text-gray-700"
         />
-        {(search || monthFilter) && (
+        {(search || monthFilter !== currentYearMonth()) && (
           <button
-            onClick={() => { setSearch(""); setMonthFilter(""); }}
+            onClick={() => { setSearch(""); setMonthFilter(currentYearMonth()); setCardPage(1); }}
             className="px-3 py-2.5 text-sm rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
           >
             Clear
@@ -173,59 +190,86 @@ export default function StockIntelligencePage() {
           <p className="text-xs">No stock submissions match the current filters.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map(s => (
-            <Link
-              key={s.showroom}
-              href={`/admin/stock-intelligence/${encodeURIComponent(s.showroom)}`}
-              className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:border-orange-300 hover:shadow-md transition-all group"
-            >
-              <div className="p-5 space-y-4">
-                {/* Showroom Name */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-xl bg-orange-50 border border-orange-100">
-                      <MapPin className="h-4 w-4 text-orange-500" />
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {paginated.map(s => (
+              <Link
+                key={s.showroom}
+                href={`/admin/stock-intelligence/${encodeURIComponent(s.showroom)}`}
+                className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:border-orange-300 hover:shadow-md transition-all group"
+              >
+                <div className="p-5 space-y-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-xl bg-orange-50 border border-orange-100">
+                        <MapPin className="h-4 w-4 text-orange-500" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-800 text-sm leading-tight">{s.showroom}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">Click to view details</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-bold text-gray-800 text-sm leading-tight">{s.showroom}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">Click to view details</p>
+                    <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-orange-400 flex-shrink-0 mt-1 transition-colors" />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-gray-50 rounded-xl p-2.5 text-center">
+                      <p className="text-xl font-black text-gray-800">{s.totalStock}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Total</p>
+                    </div>
+                    <div className="bg-orange-50 rounded-xl p-2.5 text-center">
+                      <p className="text-xl font-black text-orange-600">{s.scooters}</p>
+                      <p className="text-xs text-orange-400 mt-0.5">Vehicles</p>
+                    </div>
+                    <div className="bg-green-50 rounded-xl p-2.5 text-center">
+                      <p className="text-xl font-black text-green-600">{s.batteries}</p>
+                      <p className="text-xs text-green-400 mt-0.5">Batteries</p>
                     </div>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-orange-400 flex-shrink-0 mt-1 transition-colors" />
-                </div>
 
-                {/* Stock Numbers */}
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="bg-gray-50 rounded-xl p-2.5 text-center">
-                    <p className="text-xl font-black text-gray-800">{s.totalStock}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Total</p>
-                  </div>
-                  <div className="bg-orange-50 rounded-xl p-2.5 text-center">
-                    <p className="text-xl font-black text-orange-600">{s.scooters}</p>
-                    <p className="text-xs text-orange-400 mt-0.5">Scooters</p>
-                  </div>
-                  <div className="bg-green-50 rounded-xl p-2.5 text-center">
-                    <p className="text-xl font-black text-green-600">{s.batteries}</p>
-                    <p className="text-xs text-green-400 mt-0.5">Batteries</p>
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                      <User className="h-3 w-3 text-gray-400" />
+                      <span className="font-medium">{s.lastExecutive}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-gray-400">
+                      <Calendar className="h-3 w-3" />
+                      {new Date(s.lastDate).toLocaleDateString()}
+                    </div>
                   </div>
                 </div>
+              </Link>
+            ))}
+          </div>
 
-                {/* Executive & Date */}
-                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                    <User className="h-3 w-3 text-gray-400" />
-                    <span className="font-medium">{s.lastExecutive}</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-xs text-gray-400">
-                    <Calendar className="h-3 w-3" />
-                    {new Date(s.lastDate).toLocaleDateString()}
-                  </div>
-                </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-xs text-gray-400">
+                Showing {(cardPage - 1) * CARDS_PER_PAGE + 1}–{Math.min(cardPage * CARDS_PER_PAGE, filtered.length)} of {filtered.length} showrooms
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCardPage(p => Math.max(1, p - 1))}
+                  disabled={cardPage === 1}
+                  className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <span className="text-sm font-semibold text-gray-700 px-2">
+                  {cardPage} / {totalPages}
+                </span>
+                <button
+                  onClick={() => setCardPage(p => Math.min(totalPages, p + 1))}
+                  disabled={cardPage === totalPages}
+                  className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
               </div>
-            </Link>
-          ))}
-        </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

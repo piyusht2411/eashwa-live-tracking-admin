@@ -5,19 +5,54 @@ import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 import {
-  MapPin,
-  Radio,
-  Users,
-  BarChart3,
-  Shield,
   Zap,
   ChevronRight,
   LogIn,
   LayoutDashboard,
-  Navigation,
-  Clock,
-  Globe,
+  Radio,
+  Battery,
+  Shield,
+  Thermometer,
+  Wrench,
+  IndianRupee,
+  Truck,
+  Bike,
+  CheckCircle2,
+  Globe2,
+  Award,
+  ArrowRight,
+  Phone,
+  Mail,
+  MapPin,
 } from "lucide-react";
+import Image from "next/image";
+import chiwee from "../../public/images/chiwee logo.jpg"
+import eashwa from "../../public/images/logo.png"
+
+/* ─────────────────────────────────────────────
+   PLACEHOLDER LOGOS
+   Replace with <img src="/logos/chilwee.png" />
+   and <img src="/logos/eashwa.png" /> once ready
+───────────────────────────────────────────── */
+function ChilweeLogo({ size = 40 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="44" height="44" rx="11" fill="#16a34a" />
+      <rect x="5" y="13" width="27" height="18" rx="4" fill="white" fillOpacity="0.22" stroke="white" strokeWidth="2" />
+      <rect x="32" y="18.5" width="5.5" height="7" rx="2" fill="white" fillOpacity="0.75" />
+      <rect x="8" y="16" width="18" height="12" rx="2.5" fill="white" />
+    </svg>
+  );
+}
+
+function EAshwaLogo({ size = 40 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="44" height="44" rx="11" fill="#f59e0b" />
+      <path d="M27 5 L11 23 H20 L16 39 L34 19 H25 L27 5Z" fill="white" />
+    </svg>
+  );
+}
 
 export default function Home() {
   const router = useRouter();
@@ -29,30 +64,18 @@ export default function Home() {
   const [showAdminButton, setShowAdminButton] = useState(false);
   const secretTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Animated dots for banner
-  const [dots, setDots] = useState<
-    { id: number; x: number; y: number; size: number; opacity: number }[]
-  >([]);
-
+  const [scrollY, setScrollY] = useState(0);
   useEffect(() => {
-    const generated = Array.from({ length: 18 }, (_, i) => ({
-      id: i,
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: Math.random() * 6 + 3,
-      opacity: Math.random() * 0.4 + 0.1,
-    }));
-    setDots(generated);
+    const onScroll = () => setScrollY(window.scrollY);
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Secret click handler — triple-click the signal icon
   const handleSecretClick = () => {
     const next = secretClickCount + 1;
     setSecretClickCount(next);
-
     if (secretTimerRef.current) clearTimeout(secretTimerRef.current);
     secretTimerRef.current = setTimeout(() => setSecretClickCount(0), 1500);
-
     if (next >= 3) {
       setShowAdminButton(true);
       setSecretClickCount(0);
@@ -67,92 +90,106 @@ export default function Home() {
     }
   };
 
-  const features = [
+  const products = [
     {
-      icon: <Navigation className="w-6 h-6" />,
-      title: "Real-Time GPS",
-      desc: "Track every field employee on a live map with second-by-second precision.",
+      voltage: "48V",
+      emoji: "🔋",
+      tagline: "Standard City Rider",
+      desc: "Perfect for standard electric scooters, offering efficient energy usage and smooth performance for daily commuting.",
+      highlight: "Ideal for daily commuters",
     },
     {
-      icon: <Users className="w-6 h-6" />,
-      title: "Team Overview",
-      desc: "See your entire workforce at a glance — active, idle, or off-route.",
+      voltage: "60V",
+      emoji: "⚡",
+      tagline: "Balanced Performer",
+      desc: "Designed for balanced performance, providing improved range and stability for regular city travel.",
+      highlight: "Best Seller",
+      featured: true,
     },
     {
-      icon: <BarChart3 className="w-6 h-6" />,
-      title: "Smart Reports",
-      desc: "Automated attendance, distance, and performance analytics.",
+      voltage: "72V",
+      emoji: "🚀",
+      tagline: "Heavy-Duty Powerhouse",
+      desc: "Built for high power and extended range, ideal for heavy-duty usage and demanding conditions.",
+      highlight: "Maximum Performance",
     },
-    {
-      icon: <Shield className="w-6 h-6" />,
-      title: "Geo-Fencing",
-      desc: "Set zones and get instant alerts when boundaries are crossed.",
-    },
-    {
-      icon: <Clock className="w-6 h-6" />,
-      title: "History Playback",
-      desc: "Replay any employee's route for any given day, anytime.",
-    },
-    {
-      icon: <Zap className="w-6 h-6" />,
-      title: "Instant Alerts",
-      desc: "Push notifications for check-ins, deviations, and SOS events.",
-    },
+  ];
+
+  const whyItems = [
+    { icon: <Battery className="w-5 h-5" />, label: "Long-lasting battery life" },
+    { icon: <Zap className="w-5 h-5" />, label: "Stable & reliable performance" },
+    { icon: <Thermometer className="w-5 h-5" />, label: "Suitable for Indian weather" },
+    { icon: <IndianRupee className="w-5 h-5" />, label: "Cost-effective solution" },
+    { icon: <Wrench className="w-5 h-5" />, label: "Easy to maintain" },
+    { icon: <Shield className="w-5 h-5" />, label: "Backed by global expertise" },
+  ];
+
+  const applications = [
+    { icon: <Bike className="w-7 h-7" />, label: "Electric Scooters" },
+    { icon: <Truck className="w-7 h-7" />, label: "E-Rickshaws" },
+    { icon: <Truck className="w-7 h-7" />, label: "Electric Cargo Vehicles" },
+    { icon: <Zap className="w-7 h-7" />, label: "Low-Speed EVs" },
   ];
 
   return (
     <div
-      className="min-h-screen bg-white font-sans overflow-x-hidden"
-      style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}
+      className="min-h-screen bg-white text-gray-900 overflow-x-hidden"
+      style={{ fontFamily: "'Sora', 'DM Sans', 'Segoe UI', sans-serif" }}
     >
+      <link
+        href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet"
+      />
+
       {/* ── NAVBAR ── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-orange-100">
+      <nav
+        className="fixed top-0 left-0 right-0 z-50 transition-all duration-500"
+        style={{
+          background: scrollY > 40 ? "rgba(255,255,255,0.96)" : "transparent",
+          backdropFilter: scrollY > 40 ? "blur(16px)" : "none",
+          borderBottom: scrollY > 40 ? "1px solid #f3f4f6" : "none",
+          boxShadow: scrollY > 40 ? "0 1px 16px rgba(0,0,0,0.06)" : "none",
+        }}
+      >
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          {/* Logo */}
+          {/* Dual logo */}
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center shadow-md shadow-orange-200">
-              <MapPin className="w-4 h-4 text-white" />
+            <Image src={chiwee} width={50} height={50} className="object-contain rounded-md" alt="Chilwee Logo"/>
+            <span className="text-gray-300 font-light text-lg select-none">×</span>
+            <Image src={eashwa} width={50} height={50} className="object-contain rounded-md" alt="Chilwee Logo"/>
+            <div className="hidden sm:flex items-center gap-2 ml-1">
+              <div className="h-5 w-px bg-gray-200" />
+              <span className="font-extrabold text-gray-900 text-sm tracking-tight">Chilwee</span>
+              <span className="text-amber-500 font-black text-sm">×</span>
+              <span className="font-extrabold text-amber-500 text-sm tracking-tight">E-Ashwa</span>
             </div>
-            <span className="font-bold text-gray-900 text-lg tracking-tight">
-              Eashwa
-            </span>
           </div>
 
-          {/* Nav Links */}
-          {/* <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-500">
-            <a href="#features" className="hover:text-orange-500 transition-colors">Features</a>
-            <a href="#about" className="hover:text-orange-500 transition-colors">About</a>
-            <a href="#contact" className="hover:text-orange-500 transition-colors">Contact</a>
-          </div> */}
-
-          {/* Right side — secret trigger */}
           <div className="flex items-center gap-3">
-            {/* Hidden secret trigger: tiny signal icon, visually subtle */}
+            <a
+              href="#contact"
+              className="hidden sm:flex items-center gap-1.5 text-sm font-semibold text-amber-600 border border-amber-300 hover:border-amber-500 hover:bg-amber-50 px-4 py-2 rounded-lg transition-all duration-200"
+            >
+              <Phone className="w-3.5 h-3.5" />
+              Contact Us
+            </a>
             <button
               onClick={handleSecretClick}
               aria-label=""
-              className="w-6 h-6 flex items-center justify-center transition-opacity cursor-default select-none"
+              className="w-6 h-6 flex items-center justify-center cursor-default select-none"
               tabIndex={-1}
             >
               <Radio className="w-3.5 h-3.5 text-gray-400" />
             </button>
-
-            {/* Admin button — revealed after triple click */}
             {showAdminButton && (
               <button
                 onClick={handleAdminNav}
-                className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-md shadow-orange-200 transition-all duration-200 animate-fade-in"
+                className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-all duration-200 animate-fade-in shadow-md shadow-amber-200"
               >
                 {isAuthenticated && authToken ? (
-                  <>
-                    <LayoutDashboard className="w-4 h-4" />
-                    Dashboard
-                  </>
+                  <><LayoutDashboard className="w-4 h-4" />Dashboard</>
                 ) : (
-                  <>
-                    <LogIn className="w-4 h-4" />
-                    Login
-                  </>
+                  <><LogIn className="w-4 h-4" />Login</>
                 )}
               </button>
             )}
@@ -160,287 +197,450 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* ── HERO BANNER ── */}
-      <section className="relative pt-16 min-h-[92vh] flex items-center overflow-hidden bg-gradient-to-br from-orange-50 via-white to-amber-50">
-        {/* Decorative orbs */}
-        <div className="absolute -top-32 -right-32 w-[480px] h-[480px] rounded-full bg-orange-400/10 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -left-24 w-[360px] h-[360px] rounded-full bg-amber-400/10 blur-3xl pointer-events-none" />
-
-        {/* Animated tracking dots */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {dots.map((dot) => (
-            <span
-              key={dot.id}
-              className="absolute rounded-full bg-orange-400 animate-pulse"
-              style={{
-                left: `${dot.x}%`,
-                top: `${dot.y}%`,
-                width: dot.size,
-                height: dot.size,
-                opacity: dot.opacity,
-                animationDelay: `${dot.id * 0.3}s`,
-                animationDuration: `${2 + (dot.id % 3)}s`,
-              }}
-            />
-          ))}
-          {/* Grid overlay */}
+      {/* ── HERO ── */}
+      <section className="relative min-h-screen flex items-center pt-16 overflow-hidden bg-gradient-to-br from-amber-50 via-white to-green-50/40">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_20%_60%,rgba(245,158,11,0.10)_0%,transparent_55%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_80%_20%,rgba(22,163,74,0.06)_0%,transparent_50%)]" />
           <div
             className="absolute inset-0 opacity-[0.03]"
             style={{
-              backgroundImage:
-                "linear-gradient(#f97316 1px, transparent 1px), linear-gradient(90deg, #f97316 1px, transparent 1px)",
-              backgroundSize: "48px 48px",
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='100'%3E%3Cpath d='M28 66L0 50V18L28 2l28 16v32z' fill='none' stroke='%23f59e0b' stroke-width='1'/%3E%3C/svg%3E")`,
+              backgroundSize: "56px 100px",
             }}
           />
         </div>
+        <div className="absolute top-1/2 right-[-60px] -translate-y-1/2 pointer-events-none opacity-[0.05]">
+          <Zap style={{ width: 480, height: 480, color: "#f59e0b" }} />
+        </div>
 
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-20 grid grid-cols-1 lg:grid-cols-2 items-center gap-12 xl:gap-20">
-          {/* Text */}
-          <div className="text-center lg:text-left">
-            <div className="inline-flex items-center gap-2 bg-orange-100 text-orange-600 text-xs font-semibold px-3 py-1.5 rounded-full mb-6 tracking-wide uppercase">
-              <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-ping" />
-              Live Now
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-24 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div>
+            <div className="inline-flex items-center gap-2 border border-amber-300 bg-amber-50 text-amber-700 text-xs font-bold px-3 py-1.5 rounded-full mb-6 tracking-widest uppercase">
+              <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
+              Made for India's EV Revolution
             </div>
 
-            <h1 className="text-5xl sm:text-6xl font-extrabold text-gray-900 leading-[1.08] tracking-tight mb-6">
-              Track Your{" "}
-              <span className="text-orange-500">Field Team</span>{" "}
-              Live.
+            <h1 className="text-4xl sm:text-5xl xl:text-6xl font-extrabold leading-[1.06] tracking-tight text-gray-900 mb-6">
+              Powering India's
+              <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-amber-400">
+                Electric Mobility
+              </span>
+              <br />
+              with High-Performance
+              <br />
+              <span className="relative inline-block">
+                EV Batteries
+                <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-amber-400/50 rounded-full" />
+              </span>
             </h1>
 
-            <p className="text-lg text-gray-500 leading-relaxed max-w-lg mx-auto lg:mx-0 mb-10">
-              Eashwa gives managers a real-time bird's-eye view of every field
-              employee — their location, route, and status — from any device,
-              anywhere.
+            <p className="text-gray-500 text-lg leading-relaxed mb-8 max-w-md">
+              Advanced Lead Acid Battery Solutions for Electric Scooters &
+              E-Rickshaws — engineered for India's roads.
             </p>
 
-            {/* <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
-              <button className="flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold px-7 py-3.5 rounded-xl shadow-lg shadow-orange-200 transition-all duration-200 hover:scale-105 text-sm">
-                Get Started Free
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              <button className="flex items-center justify-center gap-2 bg-white hover:bg-orange-50 text-gray-700 font-semibold px-7 py-3.5 rounded-xl border border-gray-200 transition-all duration-200 text-sm">
-                Watch Demo
-              </button>
-            </div> */}
+            <div className="flex flex-wrap gap-2 mb-10">
+              {[
+                "✓  Reliable Performance Across Indian Conditions",
+                "✓  Designed for Daily EV Usage",
+                "✓  Trusted Battery Technology",
+              ].map((t) => (
+                <span
+                  key={t}
+                  className="text-xs text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded-full font-medium"
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
 
-            {/* Social proof */}
-            <div className="flex items-center gap-6 mt-10 justify-center lg:justify-start">
-              <div className="text-center lg:text-left">
-                <p className="text-2xl font-extrabold text-gray-900">500+</p>
-                <p className="text-xs text-gray-400 font-medium">Companies</p>
-              </div>
-              <div className="w-px h-10 bg-gray-200" />
-              <div className="text-center lg:text-left">
-                <p className="text-2xl font-extrabold text-gray-900">12k+</p>
-                <p className="text-xs text-gray-400 font-medium">Employees Tracked</p>
-              </div>
-              <div className="w-px h-10 bg-gray-200" />
-              <div className="text-center lg:text-left">
-                <p className="text-2xl font-extrabold text-gray-900">99.9%</p>
-                <p className="text-xs text-gray-400 font-medium">Uptime</p>
-              </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <a
+                href="#products"
+                className="inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold px-7 py-3.5 rounded-xl shadow-lg shadow-amber-200 transition-all duration-200 hover:scale-105 text-sm"
+              >
+                Get Best Price
+                <ChevronRight className="w-4 h-4" />
+              </a>
+              <a
+                href="#contact"
+                className="inline-flex items-center justify-center gap-2 border border-gray-300 hover:border-amber-400 text-gray-600 hover:text-amber-600 font-semibold px-7 py-3.5 rounded-xl transition-all duration-200 text-sm"
+              >
+                Contact Us
+                <ArrowRight className="w-4 h-4" />
+              </a>
             </div>
           </div>
 
-          {/* Map Card mockup */}
-          <div className="w-full">
-            <div className="relative bg-white rounded-3xl shadow-2xl shadow-orange-100 border border-orange-100 overflow-hidden" style={{ aspectRatio: "4/3" }}>
-              {/* Fake map bg */}
-              <div
-                className="absolute inset-0 opacity-[0.06]"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(#f97316 1px, transparent 1px), linear-gradient(90deg, #f97316 1px, transparent 1px)",
-                  backgroundSize: "32px 32px",
-                }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-br from-orange-50/60 via-white/40 to-amber-50/60" />
-
-              {/* Ping markers */}
-              {[
-                { top: "30%", left: "25%", label: "Raj K.", delay: "0s" },
-                { top: "55%", left: "60%", label: "Priya S.", delay: "0.5s" },
-                { top: "20%", left: "65%", label: "Amit D.", delay: "1s" },
-              ].map((m, i) => (
-                <div
-                  key={i}
-                  className="absolute flex flex-col items-center"
-                  style={{ top: m.top, left: m.left }}
-                >
+          {/* Hero card */}
+          <div className="relative flex justify-center lg:justify-end">
+            <div className="relative w-full max-w-[420px]">
+              <div className="bg-white border border-gray-200 rounded-3xl p-8 shadow-2xl shadow-amber-100/80">
+                <div className="flex items-center justify-center mb-8">
                   <div className="relative">
-                    <span
-                      className="absolute inset-0 rounded-full bg-orange-400 animate-ping opacity-60"
-                      style={{ animationDelay: m.delay }}
-                    />
-                    <div className="relative w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-orange-300 border-2 border-white">
-                      <MapPin className="w-4 h-4 text-white" />
+                    <div className="w-32 h-20 bg-gradient-to-b from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center shadow-xl shadow-amber-300/40">
+                      <div className="absolute -right-3 top-1/2 -translate-y-1/2 w-3 h-8 bg-amber-400 rounded-r-lg" />
+                      <Battery className="w-12 h-12 text-white/70" />
                     </div>
+                    <div className="absolute inset-0 rounded-2xl bg-amber-400/20 blur-2xl -z-10 scale-150" />
                   </div>
-                  <span className="mt-1 text-[10px] font-bold text-gray-700 bg-white px-2 py-0.5 rounded-full shadow-sm border border-gray-100 whitespace-nowrap">
-                    {m.label}
+                </div>
+                <div className="grid grid-cols-3 gap-3 mb-5">
+                  {[
+                    { val: "48–72V", label: "Range" },
+                    { val: "500+", label: "Cycles" },
+                    { val: "99.9%", label: "Uptime" },
+                  ].map((s) => (
+                    <div key={s.label} className="text-center bg-gray-50 rounded-xl p-3 border border-gray-100">
+                      <p className="text-amber-600 font-extrabold text-base leading-none mb-1">{s.val}</p>
+                      <p className="text-gray-400 text-xs">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse flex-shrink-0" />
+                  <span className="text-green-700 text-xs font-semibold">
+                    Trusted by 12,000+ EV Users across India
                   </span>
                 </div>
-              ))}
-
-              {/* Status bar */}
-              <div className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm px-5 py-3 flex items-center justify-between border-t border-orange-100">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                  <span className="text-xs font-semibold text-gray-600">
-                    3 active employees
-                  </span>
-                </div>
-                <span className="text-xs text-gray-400">Updated just now</span>
+              </div>
+              <div className="absolute -top-4 -left-6 bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg shadow-amber-200 animate-float">
+                ⚡ High Performance
+              </div>
+              <div className="absolute -bottom-4 -right-4 bg-white border border-gray-200 text-gray-700 text-xs font-semibold px-3 py-2 rounded-full shadow-xl animate-float-slow">
+                🌡️ Made for Indian Climate
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── FEATURES ── */}
-      <section id="features" className="py-24 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-16">
-            <p className="text-orange-500 font-semibold text-sm uppercase tracking-widest mb-3">
-              What We Offer
-            </p>
-            <h2 className="text-4xl sm:text-5xl font-extrabold text-gray-900 tracking-tight">
-              Everything you need to manage
+      {/* ── BRAND SECTION ── */}
+      <section className="py-16 bg-gray-50 border-y border-gray-100">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center">
+          <p className="text-gray-400 text-xs uppercase tracking-[0.25em] font-semibold mb-10">
+            Official Distributor Partnership
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-10 sm:gap-20">
+            {/* Chilwee brand block */}
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl bg-green-600 flex items-center justify-center shadow-lg shadow-green-200">
+                <Image src={chiwee} width={100} height={100} className="object-contain rounded-md" alt="Chilwee Logo"/>
+              </div>
+              <div>
+                <p className="font-extrabold text-gray-900 text-2xl tracking-tight">Chilwee</p>
+                <p className="text-gray-400 text-xs font-medium mt-0.5">Global Battery Manufacturer</p>
+              </div>
+            </div>
+
+            {/* Separator */}
+            <div className="flex flex-row sm:flex-col items-center gap-3">
+              <div className="w-14 h-px sm:w-px sm:h-14 bg-gradient-to-r sm:bg-gradient-to-b from-transparent via-amber-400 to-transparent" />
+              <span className="text-3xl font-black text-amber-500">×</span>
+              <div className="w-14 h-px sm:w-px sm:h-14 bg-gradient-to-r sm:bg-gradient-to-b from-transparent via-amber-400 to-transparent" />
+            </div>
+
+            {/* E-Ashwa brand block */}
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl bg-white flex items-center justify-center shadow-lg shadow-gray-200">
+                <Image src={eashwa} width={100} height={100} className="object-contain rounded-md" alt="Chilwee Logo"/>
+              </div>
+              <div>
+                <p className="font-extrabold text-gray-900 text-2xl tracking-tight">E-Ashwa</p>
+                <p className="text-gray-400 text-xs font-medium mt-0.5">Authorized Distributor — India</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── ABOUT ── */}
+      <section id="about" className="py-24 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div>
+            <p className="text-amber-500 text-xs uppercase tracking-[0.25em] font-bold mb-4">About Chilwee</p>
+            <h2 className="text-4xl sm:text-5xl font-extrabold leading-tight tracking-tight text-gray-900 mb-6">
+              Global Expertise in
               <br />
-              <span className="text-orange-500">your field force</span>
+              <span className="text-amber-500">EV Battery</span> Manufacturing
             </h2>
+            <p className="text-gray-500 leading-relaxed mb-5">
+              Chilwee is a well-established name in the battery industry, known for
+              delivering reliable and high-quality lead acid batteries for electric
+              vehicles. With years of manufacturing expertise, advanced production
+              facilities, and continuous innovation, Chilwee has become a trusted
+              choice for EV battery solutions.
+            </p>
+            <p className="text-gray-500 leading-relaxed">
+              The brand focuses on performance, durability, and efficiency, making
+              its batteries suitable for real-world usage across diverse
+              environments.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((f, i) => (
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { icon: <Globe2 className="w-5 h-5" />, title: "Advanced Manufacturing", desc: "State-of-the-art production technology", cls: "text-blue-600 bg-blue-50 border-blue-100 group-hover:bg-blue-600 group-hover:text-white" },
+              { icon: <Zap className="w-5 h-5" />, title: "Consistent Performance", desc: "Reliable output in every charge cycle", cls: "text-amber-600 bg-amber-50 border-amber-100 group-hover:bg-amber-500 group-hover:text-white" },
+              { icon: <Shield className="w-5 h-5" />, title: "Durable Build", desc: "Long-lasting design for daily use", cls: "text-green-600 bg-green-50 border-green-100 group-hover:bg-green-600 group-hover:text-white" },
+              { icon: <Award className="w-5 h-5" />, title: "Globally Trusted", desc: "Used by EV users worldwide", cls: "text-purple-600 bg-purple-50 border-purple-100 group-hover:bg-purple-600 group-hover:text-white" },
+            ].map((item, i) => (
               <div
                 key={i}
-                className="group p-7 rounded-2xl border border-gray-100 hover:border-orange-200 bg-white hover:bg-orange-50/40 transition-all duration-300 hover:shadow-xl hover:shadow-orange-100 hover:-translate-y-1 cursor-default"
+                className="p-5 rounded-2xl bg-gray-50 border border-gray-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group cursor-default"
               >
-                <div className="w-12 h-12 bg-orange-100 group-hover:bg-orange-500 text-orange-500 group-hover:text-white rounded-xl flex items-center justify-center mb-5 transition-all duration-300 shadow-sm">
-                  {f.icon}
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 border transition-all duration-300 ${item.cls}`}>
+                  {item.icon}
                 </div>
-                <h3 className="font-bold text-gray-900 text-lg mb-2">{f.title}</h3>
-                <p className="text-gray-500 text-sm leading-relaxed">{f.desc}</p>
+                <h4 className="font-bold text-gray-900 text-sm mb-1">{item.title}</h4>
+                <p className="text-gray-400 text-xs leading-relaxed">{item.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── CTA BAND ── */}
-      <section id="about" className="py-20 bg-orange-500 relative overflow-hidden">
+      {/* ── PRODUCTS ── */}
+      <section id="products" className="py-24 bg-gray-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-16">
+            <p className="text-amber-500 text-xs uppercase tracking-[0.25em] font-bold mb-3">Our Products</p>
+            <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-900">
+              Reliable EV Battery Solutions
+              <br />
+              <span className="text-amber-500">for Every Requirement</span>
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            {products.map((p, i) => (
+              <div
+                key={i}
+                className={`relative rounded-3xl p-8 border transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl ${
+                  p.featured
+                    ? "bg-gradient-to-br from-amber-500 to-amber-600 border-amber-400 shadow-2xl shadow-amber-200 text-white"
+                    : "bg-white border-gray-200 hover:border-amber-300 shadow-sm hover:shadow-amber-100"
+                }`}
+              >
+                {p.featured && (
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gray-900 text-amber-400 text-xs font-bold px-4 py-1 rounded-full whitespace-nowrap">
+                    ⭐ Best Seller
+                  </div>
+                )}
+                <div className="text-4xl mb-4">{p.emoji}</div>
+                <div className={`inline-block text-xs font-bold px-2.5 py-1 rounded-lg mb-4 ${p.featured ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700"}`}>
+                  {p.highlight}
+                </div>
+                <h3 className={`text-5xl font-extrabold mb-2 ${p.featured ? "text-white" : "text-amber-500"}`}>{p.voltage}</h3>
+                <p className={`font-bold text-lg mb-3 ${p.featured ? "text-white/90" : "text-gray-900"}`}>{p.tagline}</p>
+                <p className={`text-sm leading-relaxed ${p.featured ? "text-white/75" : "text-gray-500"}`}>{p.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm">
+            <p className="text-center text-gray-400 text-sm font-semibold mb-6 uppercase tracking-wider">Core Features Across All Models</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+              {["Long life cycle performance", "Stable power output", "High energy efficiency", "Strong build quality", "Suitable for Indian roads"].map((f) => (
+                <div key={f} className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                  <span className="text-gray-500 text-xs">{f}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── PERFORMANCE & TECH ── */}
+      <section className="py-24 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div className="relative order-2 lg:order-1">
+            <div className="bg-gradient-to-br from-amber-50 to-white border border-amber-100 rounded-3xl p-8 shadow-sm">
+              {[
+                { label: "Voltage Stability", pct: 96 },
+                { label: "Charge Efficiency", pct: 91 },
+                { label: "Temperature Resistance", pct: 88 },
+                { label: "Cycle Life", pct: 94 },
+              ].map((bar) => (
+                <div key={bar.label} className="mb-5 last:mb-0">
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-gray-600 font-medium">{bar.label}</span>
+                    <span className="text-amber-600 font-bold">{bar.pct}%</span>
+                  </div>
+                  <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full" style={{ width: `${bar.pct}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="order-1 lg:order-2">
+            <p className="text-amber-500 text-xs uppercase tracking-[0.25em] font-bold mb-4">Technology</p>
+            <h2 className="text-4xl sm:text-5xl font-extrabold leading-tight tracking-tight text-gray-900 mb-6">
+              Engineered for Performance
+              <br />
+              <span className="text-amber-500">& Durability</span>
+            </h2>
+            <p className="text-gray-500 leading-relaxed mb-5">
+              Chilwee batteries are designed to deliver consistent power and reliability in everyday EV usage. With optimized internal structure and robust build quality, these batteries ensure smooth operation and dependable output.
+            </p>
+            <p className="text-gray-500 leading-relaxed mb-8">
+              The technology focuses on maintaining performance over time while handling varying load conditions, making them suitable for both personal and commercial EV applications.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {["Consistent voltage output", "Efficient charge-discharge cycles", "Resistance to temperature variations", "Low maintenance requirements"].map((adv) => (
+                <div key={adv} className="flex items-center gap-2">
+                  <Zap className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                  <span className="text-gray-600 text-sm">{adv}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── APPLICATIONS ── */}
+      <section className="py-24 bg-gray-50 border-y border-gray-100">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-12">
+            <p className="text-amber-500 text-xs uppercase tracking-[0.25em] font-bold mb-3">Applications</p>
+            <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-900">
+              Applications Across
+              <br />
+              <span className="text-amber-500">Electric Mobility</span>
+            </h2>
+            <p className="text-gray-400 mt-4 max-w-xl mx-auto">
+              Chilwee EV batteries are widely used in different types of electric vehicles, making them a versatile choice for India's growing EV ecosystem.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
+            {applications.map((app, i) => (
+              <div
+                key={i}
+                className="flex flex-col items-center gap-3 p-7 rounded-2xl bg-white border border-gray-200 hover:border-amber-300 hover:shadow-lg hover:shadow-amber-50 hover:-translate-y-1 transition-all duration-300 group cursor-default"
+              >
+                <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-500 group-hover:bg-amber-500 group-hover:text-white flex items-center justify-center transition-all duration-300">
+                  {app.icon}
+                </div>
+                <span className="text-sm font-semibold text-gray-700 text-center">{app.label}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-center text-gray-400 text-sm">
+            Designed to support both <span className="text-gray-700 font-medium">individual users</span> and <span className="text-gray-700 font-medium">commercial operations</span>.
+          </p>
+        </div>
+      </section>
+
+      {/* ── WHY CHILWEE ── */}
+      <section className="py-24 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-16">
+            <p className="text-amber-500 text-xs uppercase tracking-[0.25em] font-bold mb-3">Why Us</p>
+            <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-900">
+              Why Choose <span className="text-amber-500">Chilwee</span> EV Batteries
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {whyItems.map((item, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-4 p-5 rounded-2xl bg-gray-50 border border-gray-100 hover:border-amber-300 hover:bg-amber-50 hover:shadow-md transition-all duration-300 group cursor-default"
+              >
+                <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-600 group-hover:bg-amber-500 group-hover:text-white flex items-center justify-center flex-shrink-0 transition-all duration-300">
+                  {item.icon}
+                </div>
+                <span className="text-gray-700 font-medium text-sm">{item.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── QUALITY BAND ── */}
+      <section className="py-24 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-500 to-amber-600" />
         <div
           className="absolute inset-0 opacity-10"
           style={{
-            backgroundImage:
-              "radial-gradient(circle, #fff 1px, transparent 1px)",
-            backgroundSize: "28px 28px",
+            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='100'%3E%3Cpath d='M28 66L0 50V18L28 2l28 16v32z' fill='none' stroke='%23fff' stroke-width='1'/%3E%3C/svg%3E")`,
+            backgroundSize: "56px 100px",
           }}
         />
         <div className="relative max-w-3xl mx-auto px-4 sm:px-6 text-center">
-          <Globe className="w-10 h-10 text-white/60 mx-auto mb-5" />
-          <h2 className="text-4xl sm:text-5xl font-extrabold text-white mb-5 leading-tight">
-            Know where your team is,
-            <br />
-            at every moment.
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/20 mb-6 mx-auto">
+            <Award className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-4xl sm:text-5xl font-extrabold text-white leading-tight mb-6 tracking-tight">
+            Built for Long-Term Reliability 🏆
           </h2>
-          <p className="text-orange-100 text-lg mb-10 max-w-xl mx-auto leading-relaxed">
-            Eashwa Live Tracking is built for businesses that run on field
-            operations — FMCG, logistics, healthcare, services, and more.
+          <p className="text-white/80 text-lg leading-relaxed mb-4 max-w-xl mx-auto">
+            Each battery is designed with a focus on long-term usability and consistent performance. The manufacturing process emphasizes quality control and durability to ensure dependable output over time.
           </p>
-          {/* <button className="inline-flex items-center gap-2 bg-white text-orange-600 font-bold px-8 py-4 rounded-xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-200 text-sm">
-            Start Free Trial
-            <ChevronRight className="w-4 h-4" />
-          </button> */}
+          <p className="text-white/65 leading-relaxed max-w-lg mx-auto">
+            Chilwee batteries are built to handle daily usage demands, making them a practical and reliable energy solution for EV users.
+          </p>
         </div>
       </section>
 
       {/* ── FOOTER ── */}
-      <footer id="contact" className="bg-gray-950 text-white">
-        {/* Middle bar */}
-        <div className="border-b border-white/5">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
-            {/* Brand */}
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
-                  <MapPin className="w-4 h-4 text-white" />
-                </div>
-                <span className="font-bold text-lg tracking-tight">
-                  Eashwa<span className="text-orange-500">.</span>
-                </span>
-              </div>
-              <p className="text-gray-400 text-sm leading-relaxed">
-                Real-time field employee tracking & management for modern teams.
-              </p>
+      <footer id="contact" className="bg-gray-900 text-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
+          <div className="sm:col-span-2 lg:col-span-1">
+            <div className="flex items-center gap-2.5 mb-4">
+              <Image src={chiwee} width={50} height={50} className="object-contain rounded-md" alt="Chilwee Logo"/>
+              <span className="text-gray-600 font-light">×</span>
+              <Image src={eashwa} width={50} height={50} className="object-contain rounded-md" alt="Chilwee Logo"/>
             </div>
+            <p className="text-gray-400 text-sm leading-relaxed mb-5">
+              High-performance EV battery solutions for India's growing electric mobility ecosystem.
+            </p>
+            <div className="flex gap-2">
+              {["Twitter", "LinkedIn", "YouTube"].map((s) => (
+                <a key={s} href="#" className="text-xs bg-white/5 hover:bg-amber-500 text-gray-400 hover:text-white px-3 py-1.5 rounded-lg transition-colors duration-200">{s}</a>
+              ))}
+            </div>
+          </div>
 
-            {/* Product */}
-            <div>
-              <p className="font-semibold text-sm mb-4 text-gray-300 uppercase tracking-wider">
-                Product
-              </p>
-              <ul className="space-y-2.5 text-sm text-gray-400">
-                {["Features", "Pricing", "Integrations", "Changelog"].map((l) => (
-                  <li key={l}>
-                    <a href="#" className="hover:text-orange-400 transition-colors">
-                      {l}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          <div>
+            <p className="font-bold text-xs mb-5 text-gray-300 uppercase tracking-[0.2em]">Products</p>
+            <ul className="space-y-3 text-sm text-gray-500">
+              {["48V Battery", "60V Battery", "72V Battery", "E-Scooter Batteries", "E-Rickshaw Batteries"].map((l) => (
+                <li key={l}><a href="#products" className="hover:text-amber-400 transition-colors">{l}</a></li>
+              ))}
+            </ul>
+          </div>
 
-            {/* Company */}
-            <div>
-              <p className="font-semibold text-sm mb-4 text-gray-300 uppercase tracking-wider">
-                Company
-              </p>
-              <ul className="space-y-2.5 text-sm text-gray-400">
-                {["About", "Blog", "Careers", "Press"].map((l) => (
-                  <li key={l}>
-                    <a href="#" className="hover:text-orange-400 transition-colors">
-                      {l}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          <div>
+            <p className="font-bold text-xs mb-5 text-gray-300 uppercase tracking-[0.2em]">Company</p>
+            <ul className="space-y-3 text-sm text-gray-500">
+              {["About Chilwee", "Technology", "Quality", "Applications", "Blog"].map((l) => (
+                <li key={l}><a href="#about" className="hover:text-amber-400 transition-colors">{l}</a></li>
+              ))}
+            </ul>
+          </div>
 
-            {/* Contact */}
-            <div>
-              <p className="font-semibold text-sm mb-4 text-gray-300 uppercase tracking-wider">
-                Get In Touch
-              </p>
-              <ul className="space-y-2.5 text-sm text-gray-400">
-                <li>support@eashwa.in</li>
-                <li>+91 98765 43210</li>
-                <li className="pt-2">
-                  <div className="flex gap-3">
-                    {["Twitter", "LinkedIn", "YouTube"].map((s) => (
-                      <a
-                        key={s}
-                        href="#"
-                        className="text-xs bg-white/5 hover:bg-orange-500 px-3 py-1.5 rounded-lg transition-colors duration-200"
-                      >
-                        {s}
-                      </a>
-                    ))}
-                  </div>
-                </li>
-              </ul>
-            </div>
+          <div>
+            <p className="font-bold text-xs mb-5 text-gray-300 uppercase tracking-[0.2em]">Get In Touch</p>
+            <ul className="space-y-3 text-sm text-gray-500">
+              <li className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />support@eashwa.in</li>
+              <li className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />+91 98765 43210</li>
+              <li className="flex items-start gap-2">
+                <MapPin className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+                <span>India Operations<br />Authorized Distributor</span>
+              </li>
+            </ul>
           </div>
         </div>
 
-        {/* Bottom bar */}
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500">
-          <p>© {new Date().getFullYear()} Eashwa Technologies. All rights reserved.</p>
+        <div className="border-t border-white/5 max-w-6xl mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-600">
+          <p>© {new Date().getFullYear()} Chilwee × E-Ashwa. All rights reserved.</p>
           <div className="flex gap-5">
-            <a href="#" className="hover:text-orange-400 transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-orange-400 transition-colors">Terms of Service</a>
+            <a href="#" className="hover:text-amber-400 transition-colors">Privacy Policy</a>
+            <a href="#" className="hover:text-amber-400 transition-colors">Terms of Service</a>
           </div>
         </div>
       </footer>
@@ -450,7 +650,17 @@ export default function Home() {
           from { opacity: 0; transform: translateY(-4px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        .animate-fade-in { animation: fade-in 0.25s ease forwards; }
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50%       { transform: translateY(-8px); }
+        }
+        @keyframes float-slow {
+          0%, 100% { transform: translateY(0px); }
+          50%       { transform: translateY(-5px); }
+        }
+        .animate-fade-in   { animation: fade-in 0.25s ease forwards; }
+        .animate-float      { animation: float 3s ease-in-out infinite; }
+        .animate-float-slow { animation: float-slow 4s ease-in-out infinite; }
         html { scroll-behavior: smooth; }
       `}</style>
     </div>

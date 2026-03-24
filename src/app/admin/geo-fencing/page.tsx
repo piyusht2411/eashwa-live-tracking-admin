@@ -1,232 +1,207 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Locate, Plus, Edit3, Save, X, Loader2 } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Home, Search, MapPin, Loader2, Users } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
-import { getGeofences, createGeofence, updateGeofence } from "@/lib/api";
+import { getHomeLocations } from "@/lib/api";
 import { toast } from "sonner";
 
 const Map = dynamic(() => import("@/components/LiveMap"), { ssr: false });
 
-export interface Geofence {
-  _id?: string;
+interface HomeUser {
+  _id: string;
   name: string;
+  employeeId: string;
+  role: string;
   department: string;
-  center: { lat: number; lng: number };
-  radius: number;
-  isActive?: boolean;
+  phone: string;
+  homeLocation: {
+    lat: number;
+    lng: number;
+    address: string;
+  };
 }
 
+const ROLE_COLORS: Record<string, string> = {
+  employee: "#f97316",
+  manager: "#3b82f6",
+  hr: "#8b5cf6",
+  admin: "#ef4444",
+};
+
 export default function GeoFencingPage() {
-  const [zones, setZones] = useState<Geofence[]>([]);
-  const [selected, setSelected] = useState<Geofence | null>(null);
-  const [editing, setEditing] = useState(false);
-  const [radius, setRadius] = useState(500);
+  const [users, setUsers] = useState<HomeUser[]>([]);
+  const [selected, setSelected] = useState<HomeUser | null>(null);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  
   const token = useSelector((state: RootState) => state.auth.authToken);
 
-  const fetchZones = async () => {
-    if (!token) return;
-    try {
-      setLoading(true);
-      const res = await getGeofences(token);
-      setZones(res || []);
-      if (res && res.length > 0 && !selected) {
-        setSelected(res[0]);
-        setRadius(res[0].radius);
-      }
-    } catch (err) {
-      toast.error("Failed to load geofences");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchZones();
+    if (!token) return;
+    const fetch = async () => {
+      try {
+        setLoading(true);
+        const res = await getHomeLocations(token);
+        const data: HomeUser[] = (res.data || []).filter(
+          (u: HomeUser) => u.homeLocation?.lat && u.homeLocation?.lng
+        );
+        setUsers(data);
+        if (data.length > 0) setSelected(data[0]);
+      } catch {
+        toast.error("Failed to load home locations");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetch();
   }, [token]);
 
-  const handleSave = async () => {
-    if (!selected || !token) return;
-    try {
-      setSaving(true);
-      if (selected._id) {
-        await updateGeofence(token, selected._id, { radius });
-        toast.success("Geofence updated successfully");
-      } else {
-        // If it's a "new" zone
-        await createGeofence(token, { ...selected, radius });
-        toast.success("Geofence created successfully");
-      }
-      setEditing(false);
-      fetchZones(); // Refresh
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save geofence");
-    } finally {
-      setSaving(false);
-    }
-  };
+  const filtered = useMemo(() =>
+    users.filter(u =>
+      !search ||
+      u.name.toLowerCase().includes(search.toLowerCase()) ||
+      u.employeeId.toLowerCase().includes(search.toLowerCase()) ||
+      u.department?.toLowerCase().includes(search.toLowerCase())
+    ),
+    [users, search]
+  );
 
-  const mapCenter: [number, number] = selected ? [selected.center.lat, selected.center.lng] : [19.076, 72.877];
+  const markers = useMemo(() =>
+    filtered.map(u => ({
+      position: [u.homeLocation.lat, u.homeLocation.lng] as [number, number],
+      label: u.name,
+      color: selected?._id === u._id ? "#f97316" : (ROLE_COLORS[u.role] ?? "#6b7280"),
+      popup: `${u.employeeId} · ${u.department}\n${u.homeLocation.address}`,
+    })),
+    [filtered, selected]
+  );
 
-  const markers = zones.map(z => ({
-    position: [z.center.lat, z.center.lng] as [number, number],
-    label: z.name,
-    color: selected?._id === z._id ? "orange" as const : "green" as const,
-    popup: `Zone: ${z.name} · Radius: ${z.radius}m`,
-  }));
+  const mapCenter: [number, number] = selected
+    ? [selected.homeLocation.lat, selected.homeLocation.lng]
+    : [20.5937, 78.9629];
 
   return (
     <div className="p-6 space-y-5">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-black text-gray-800">Geo-Fencing & Home Location</h1>
-        <p className="text-sm text-gray-500">Set employee home locations and geo-fence zones</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-gray-800">Home Locations</h1>
+          <p className="text-sm text-gray-500">Employee registered home addresses on map</p>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-100 rounded-xl">
+          <Users className="h-4 w-4 text-orange-500" />
+          <span className="text-sm font-semibold text-orange-700">{users.length} employees</span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Employee list */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
           <div className="px-4 py-3 border-b border-gray-100">
-            <h3 className="font-bold text-gray-800 text-sm">Geofence Zones</h3>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search name, ID, department..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-gray-200 focus:border-orange-400 outline-none bg-gray-50"
+              />
+            </div>
           </div>
-          <div className="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
+
+          <div className="divide-y divide-gray-50 overflow-y-auto max-h-[500px]">
             {loading ? (
-               <div className="p-6 flex flex-col items-center justify-center text-gray-400">
-                 <Loader2 className="h-6 w-6 animate-spin text-orange-400 mb-2" />
-                 <p className="text-sm">Loading zones...</p>
-               </div>
-            ) : zones.length === 0 ? (
-              <div className="p-6 text-center text-gray-400 text-sm">No geofences found</div>
-            ) : (
-              zones.map((zone) => (
-                <button
-                  key={zone._id || zone.name}
-                  onClick={() => { setSelected(zone); setRadius(zone.radius); setEditing(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-orange-50/40 transition-colors text-left ${
-                    selected?._id === zone._id ? "bg-orange-50/60 border-r-2 border-orange-400" : ""
-                  }`}
+              <div className="p-8 flex flex-col items-center text-gray-400">
+                <Loader2 className="h-6 w-6 animate-spin text-orange-400 mb-2" />
+                <p className="text-sm">Loading locations...</p>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="p-8 text-center text-sm text-gray-400">
+                <Home className="h-6 w-6 mx-auto mb-2 opacity-40" />
+                No employees found
+              </div>
+            ) : filtered.map(u => (
+              <button
+                key={u._id}
+                onClick={() => setSelected(u)}
+                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-orange-50/40 transition-colors text-left ${
+                  selected?._id === u._id ? "bg-orange-50/60 border-r-2 border-orange-400" : ""
+                }`}
+              >
+                <div
+                  className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold text-xs uppercase"
+                  style={{ backgroundColor: ROLE_COLORS[u.role] ?? "#6b7280" }}
                 >
-                  <div className="w-9 h-9 rounded-full bg-orange-100 text-orange-600 font-bold text-sm flex items-center justify-center flex-shrink-0 uppercase">
-                    {zone.name.slice(0, 2)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 truncate">{zone.name}</p>
-                  </div>
-                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${zone.isActive !== false ? "bg-green-500" : "bg-gray-300"}`} />
-                </button>
-              ))
-            )}
-          </div>
-          <div className="p-3">
-            <button 
-              onClick={() => {
-                const newZone = {
-                  name: "New Zone", department: "Sales",
-                  center: { lat: 19.076, lng: 72.877 }, radius: 500
-                };
-                setSelected(newZone);
-                setRadius(500);
-                setEditing(true);
-              }}
-              className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-orange-200 rounded-xl text-orange-500 text-sm font-semibold hover:bg-orange-50 transition-colors">
-              <Plus className="h-4 w-4" /> Add Geofence
-            </button>
+                  {u.name.slice(0, 2)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 truncate">{u.name}</p>
+                  <p className="text-xs text-gray-400 truncate">{u.homeLocation.address || `${u.homeLocation.lat.toFixed(4)}, ${u.homeLocation.lng.toFixed(4)}`}</p>
+                </div>
+                <span className="text-xs text-gray-400 capitalize flex-shrink-0">{u.role}</span>
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Map + Config */}
+        {/* Map + selected info */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Config panel */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 h-fit">
-            {selected ? (
-              <>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-600 font-bold text-sm flex items-center justify-center uppercase">
-                      {selected.name.slice(0, 2)}
-                    </div>
-                    <div>
-                      <p className="font-bold text-gray-800">{selected.name}</p>
-                    </div>
-                  </div>
-                  {!editing ? (
-                    <button
-                      onClick={() => setEditing(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-orange-50 text-orange-500 hover:bg-orange-100 transition-colors"
-                    >
-                      <Edit3 className="h-3 w-3" /> Edit
-                    </button>
-                  ) : (
-                    <div className="flex gap-1.5">
-                      <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors disabled:opacity-50"
-                      >
-                        {saving ? <Loader2 className="h-3 w-3 animate-spin"/> : <Save className="h-3 w-3" />} Save
-                      </button>
-                      <button
-                        onClick={() => { setEditing(false); setRadius(selected.radius); }}
-                        className="p-1.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
+          {/* Selected employee info */}
+          {selected && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4">
+              <div
+                className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-lg uppercase flex-shrink-0"
+                style={{ backgroundColor: ROLE_COLORS[selected.role] ?? "#6b7280" }}
+              >
+                {selected.name.slice(0, 2)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-gray-800">{selected.name}</p>
+                <p className="text-xs text-gray-400">{selected.employeeId} · {selected.department} · {selected.phone}</p>
+                <div className="flex items-center gap-1 mt-1 text-xs text-orange-600">
+                  <MapPin className="h-3 w-3 flex-shrink-0" />
+                  <span className="truncate">{selected.homeLocation.address || `${selected.homeLocation.lat.toFixed(5)}, ${selected.homeLocation.lng.toFixed(5)}`}</span>
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-xs text-gray-400 mb-1">Center Coordinates</p>
-                    <p className="font-medium text-gray-700 font-mono text-xs">
-                       {selected.center.lat.toFixed(4)}, {selected.center.lng.toFixed(4)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400 mb-1">Geo-fence Radius</p>
-                    {editing ? (
-                      <input
-                        type="number"
-                        value={radius}
-                        onChange={e => setRadius(Number(e.target.value))}
-                        className="w-full px-2 py-1 text-sm border border-orange-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-400"
-                        placeholder="Meters"
-                      />
-                    ) : (
-                      <p className="font-medium text-gray-700">{radius}m</p>
-                    )}
-                  </div>
-                </div>
-                {!editing && (
-                  <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
-                    <Locate className="h-4 w-4 text-orange-400 flex-shrink-0" />
-                    Boundary limits where team members can punch in/out and perform field operations
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="py-6 text-center text-gray-500 text-sm">Select a zone to view or edit config</div>
-            )}
-          </div>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className="text-xs text-gray-400">Coordinates</p>
+                <p className="text-xs font-mono text-gray-600">{selected.homeLocation.lat.toFixed(5)}</p>
+                <p className="text-xs font-mono text-gray-600">{selected.homeLocation.lng.toFixed(5)}</p>
+              </div>
+            </div>
+          )}
 
           {/* Map */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-              <Locate className="h-4 w-4 text-orange-500" />
+              <Home className="h-4 w-4 text-orange-500" />
               <span className="font-semibold text-sm text-gray-800">Home Location Map</span>
-              <span className="text-xs text-gray-400 ml-auto">🟠 Selected · 🟢 Others</span>
+              <div className="ml-auto flex items-center gap-3 text-xs text-gray-400">
+                {Object.entries(ROLE_COLORS).map(([role, color]) => (
+                  <span key={role} className="flex items-center gap-1 capitalize">
+                    <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: color }} />
+                    {role}
+                  </span>
+                ))}
+              </div>
             </div>
-            <div className="h-72 bg-gray-50 relative z-0">
-              <Map
-                center={mapCenter}
-                zoom={13}
-                markers={markers}
-                height="100%"
-              />
+            <div className="h-[420px] bg-gray-50 relative z-0">
+              {loading ? (
+                <div className="h-full flex items-center justify-center text-gray-400">
+                  <Loader2 className="h-6 w-6 animate-spin text-orange-400" />
+                </div>
+              ) : (
+                <Map
+                  center={mapCenter}
+                  zoom={13}
+                  markers={markers}
+                  autoFit={markers.length > 1}
+                  height="100%"
+                />
+              )}
             </div>
           </div>
         </div>

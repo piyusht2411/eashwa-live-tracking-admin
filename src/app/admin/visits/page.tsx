@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import * as XLSX from "xlsx";
 import { Search, Navigation, Download, Loader2, ChevronDown, Eye, Check, X, Image, Phone, MapPin, Clock, MessageSquare, Battery, Bike } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
@@ -113,30 +114,25 @@ export default function VisitsPage() {
   }), [visits, searchEmployee, searchManager, monthFilter, dateFilter, statusFilter]);
 
   const exportCSV = () => {
-    const headers = ["Employee Name", "Manager", "Visit Date", "Visit Time", "Showroom", "Address", "Time Spent (min)", "Distance (km)", "Stock Updated", "Total Vehicles", "Battery Count", "Photo", "Status"];
-    const rows = filtered.map(v => [
-      v.employeeName,
-      v.managerName || "—",
-      new Date(v.visitDate).toLocaleDateString(),
-      v.visitTime || "—",
-      v.showroomName,
-      v.address || "—",
-      v.timeSpent ?? "—",
-      v.distance ?? "—",
-      v.stockUpdated ? "Yes" : "No",
-      v.totalVehicles ?? "—",
-      v.batteryCount ?? "—",
-      v.photoUrl ? "Yes" : "No",
-      v.status,
-    ]);
-    const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "visit_records.csv";
-    a.click();
-    URL.revokeObjectURL(url);
+    const rows = filtered.map(v => ({
+      "Employee Name": v.employeeName,
+      Manager: v.managerName || "—",
+      "Visit Date": new Date(v.visitDate).toLocaleDateString(),
+      "Visit Time": v.visitTime || "—",
+      Showroom: v.showroomName,
+      Address: v.address || "—",
+      "Time Spent (min)": v.timeSpent ?? "—",
+      "Distance (km)": v.distance ?? "—",
+      "Stock Updated": v.stockUpdated ? "Yes" : "No",
+      "Total Vehicles": v.totalVehicles ?? "—",
+      "Battery Count": v.batteryCount ?? "—",
+      Photo: v.photoUrl ? "Yes" : "No",
+      Status: v.status,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Visits");
+    XLSX.writeFile(wb, "visit_records.xlsx");
   };
 
   const clearFilters = () => {

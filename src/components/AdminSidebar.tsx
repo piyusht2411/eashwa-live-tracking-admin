@@ -101,13 +101,13 @@ const allMenuItems = [
     description: "Sales & Stock Insights",
     roles: ["admin", "hr", "manager"],
   },
-  // {
-  //   icon: Locate,
-  //   label: "Geo-Fencing",
-  //   href: "/admin/geo-fencing",
-  //   description: "Home Location & Zones",
-  //   roles: ["admin", "hr"],
-  // },
+  {
+    icon: Locate,
+    label: "Geo-Fencing",
+    href: "/admin/geo-fencing",
+    description: "Home Location & Zones",
+    roles: ["admin", "hr", "manager"],
+  },
   {
     icon: Coffee,
     label: "Break Monitor",

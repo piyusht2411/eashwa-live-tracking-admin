@@ -59,6 +59,9 @@ export default function EditEmployeeModal({ open, employeeId, onClose, onSuccess
           aadhaarNumber: data.aadhaarNumber || null,
           managerId: data.managedBy?._id || "",
           joiningDate: data.joiningDate ? data.joiningDate.split("T")[0] : "",
+          homeLat: data.homeLocation?.lat != null ? String(data.homeLocation.lat) : "",
+          homeLng: data.homeLocation?.lng != null ? String(data.homeLocation.lng) : "",
+          homeAddress: data.homeLocation?.address || "",
         });
         setExistingImage(data.profilePicture || "");
       } catch {
@@ -70,7 +73,7 @@ export default function EditEmployeeModal({ open, employeeId, onClose, onSuccess
       setFetchingManagers(true);
       try {
         const res = await fetchAdminsAndManagers();
-        setAdminsAndManagers(res.data || res); // handles both {data} and direct array
+        setAdminsAndManagers(res.data || res);
       } catch {
         toast.error("Failed to load managers");
       } finally {
@@ -101,13 +104,35 @@ export default function EditEmployeeModal({ open, employeeId, onClose, onSuccess
     try {
       const payload: any = { ...form };
       if (!payload.password || payload.password.trim() === "") {
-        delete payload.password; // don't send empty password on edit
+        delete payload.password;
+      }
+
+      // Build homeLocation as nested object (matches DB schema)
+      const homeLocation: { lat?: number; lng?: number; address?: string } = {};
+      if (payload.homeLat !== "" && payload.homeLat != null) {
+        const lat = parseFloat(payload.homeLat);
+        if (!isNaN(lat)) homeLocation.lat = lat;
+      }
+      if (payload.homeLng !== "" && payload.homeLng != null) {
+        const lng = parseFloat(payload.homeLng);
+        if (!isNaN(lng)) homeLocation.lng = lng;
+      }
+      if (payload.homeAddress?.trim()) {
+        homeLocation.address = payload.homeAddress.trim();
+      }
+
+      // Remove flat fields, send nested object instead
+      delete payload.homeLat;
+      delete payload.homeLng;
+      delete payload.homeAddress;
+      if (Object.keys(homeLocation).length > 0) {
+        payload.homeLocation = homeLocation;
       }
 
       await updateEmployee(token, employeeId, payload, profilePicFile);
 
       toast.success("Employee updated successfully!");
-      onSuccess(); // ← refreshes the employee list
+      onSuccess();
       onClose();
     } catch (err: any) {
       toast.error(err.message || "Update failed");
@@ -132,7 +157,7 @@ export default function EditEmployeeModal({ open, employeeId, onClose, onSuccess
         <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-orange-500 to-orange-600 text-white flex items-center justify-between">
           <div>
             <h2 className="text-lg font-black">Edit Employee</h2>
-            <p className="text-blue-100 text-xs">Update details • Profile picture optional</p>
+            <p className="text-orange-100 text-xs">Update details • Profile picture optional</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-xl transition">
             <X className="h-5 w-5" />
@@ -155,7 +180,7 @@ export default function EditEmployeeModal({ open, employeeId, onClose, onSuccess
                     <User className="h-12 w-12 text-gray-400" />
                   </div>
                 )}
-                <div className="absolute bottom-2 right-2 bg-blue-500 text-white p-2.5 rounded-full shadow-lg group-hover:scale-110 transition">
+                <div className="absolute bottom-2 right-2 bg-orange-500 text-white p-2.5 rounded-full shadow-lg group-hover:scale-110 transition">
                   <Upload className="h-4 w-4" />
                 </div>
               </div>
@@ -191,7 +216,7 @@ export default function EditEmployeeModal({ open, employeeId, onClose, onSuccess
                 onChange={(e) => set("password", e.target.value)}
                 className={inputClass + " pr-16"}
               />
-              <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-blue-500 font-semibold">
+              <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-orange-500 font-semibold">
                 {showPass ? "Hide" : "Show"}
               </button>
             </div>
@@ -274,15 +299,70 @@ export default function EditEmployeeModal({ open, employeeId, onClose, onSuccess
             </div>
           </div>
 
+          {/* Home Location */}
+          <div className="pt-4 border-t border-gray-200">
+            <label className="block text-sm font-semibold text-gray-700 mb-3">
+              Home Location <span className="text-gray-400 text-xs font-normal">(for accurate attendance / geofencing)</span>
+            </label>
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className={labelClass}>Latitude</label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="e.g. 28.7041"
+                    value={form.homeLat ?? ""}
+                    onChange={(e) => set("homeLat", e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <p className="text-[10px] text-gray-500 mt-1">Required for correct location</p>
+              </div>
+
+              <div>
+                <label className={labelClass}>Longitude</label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="e.g. 77.1025"
+                    value={form.homeLng ?? ""}
+                    onChange={(e) => set("homeLng", e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <p className="text-[10px] text-gray-500 mt-1">Required for correct location</p>
+              </div>
+            </div>
+
+            <div>
+              <label className={labelClass}>Home Address (optional)</label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
+                <textarea
+                  rows={2}
+                  placeholder="e.g. 123 Main Street, Delhi"
+                  value={form.homeAddress || ""}
+                  onChange={(e) => set("homeAddress", e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none bg-gray-50 focus:bg-white transition-all resize-none"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Submit Buttons */}
           <div className="flex gap-3 pt-6">
-            <button type="button" onClick={onClose} className="flex-1 py-3 border-2 border-gray-200 text-gray-600 font-bold rounded-xl text-sm hover:border-orange-300 transition">
+            <button type="button" onClick={onClose} className="flex-1 py-3 border-2 border-gray-200 text-gray-600 font-bold rounded-xl text-sm hover:border-orange-300 hover:text-orange-600 transition">
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl text-sm transition disabled:opacity-60 flex items-center justify-center gap-2"
+              className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-sm transition disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>

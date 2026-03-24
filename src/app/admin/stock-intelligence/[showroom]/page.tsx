@@ -25,7 +25,11 @@ export default function ShowroomDetailPage() {
   const [submissions, setSubmissions] = useState<StockSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [modelFilter, setModelFilter] = useState("all");
-  const [monthFilter, setMonthFilter] = useState("");
+  const currentYearMonth = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  };
+  const [monthFilter, setMonthFilter] = useState(currentYearMonth);
   const token = useSelector((state: RootState) => state.auth.authToken);
 
   useEffect(() => {
@@ -33,7 +37,14 @@ export default function ShowroomDetailPage() {
       if (!token) return;
       try {
         setLoading(true);
-        const res = await getStockSubmissions(token);
+        let year: number | undefined;
+        let month: number | undefined;
+        if (monthFilter) {
+          const [y, m] = monthFilter.split("-").map(Number);
+          year = y;
+          month = m;
+        }
+        const res = await getStockSubmissions(token, { year, month, limit: 1000 });
         const rawData: any[] = Array.isArray(res) ? res : (res.data || []);
         const flattened: StockSubmission[] = rawData.flatMap((submission: any) =>
           (submission.stock || []).map((stockItem: any) => ({
@@ -54,7 +65,7 @@ export default function ShowroomDetailPage() {
       }
     };
     fetchStock();
-  }, [token, showroomName]);
+  }, [token, showroomName, monthFilter]);
 
   const models = useMemo(() => {
     const s = new Set(submissions.map(s => s.item));
@@ -63,13 +74,8 @@ export default function ShowroomDetailPage() {
 
   const filtered = useMemo(() => submissions.filter(s => {
     if (modelFilter !== "all" && s.item !== modelFilter) return false;
-    if (monthFilter) {
-      const d = new Date(s.date);
-      const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      if (m !== monthFilter) return false;
-    }
     return true;
-  }), [submissions, modelFilter, monthFilter]);
+  }), [submissions, modelFilter]);
 
   // Model-wise aggregates
   const modelAgg = useMemo(() => {
@@ -128,7 +134,7 @@ export default function ShowroomDetailPage() {
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: "Total Stock", value: totalQty, color: "bg-gray-50 border-gray-200 text-gray-700" },
-          { label: "Scooters", value: totalScooters, color: "bg-orange-50 border-orange-100 text-orange-600" },
+          { label: "Vehicle", value: totalScooters, color: "bg-orange-50 border-orange-100 text-orange-600" },
           { label: "Batteries", value: totalBatteries, color: "bg-green-50 border-green-100 text-green-600" },
         ].map(s => (
           <div key={s.label} className={`rounded-2xl border p-4 ${s.color}`}>
@@ -157,9 +163,9 @@ export default function ShowroomDetailPage() {
           onChange={e => setMonthFilter(e.target.value)}
           className="px-3 py-2.5 text-sm rounded-xl border border-gray-200 focus:border-orange-400 outline-none bg-white font-medium text-gray-700"
         />
-        {(modelFilter !== "all" || monthFilter) && (
+        {(modelFilter !== "all" || monthFilter !== currentYearMonth()) && (
           <button
-            onClick={() => { setModelFilter("all"); setMonthFilter(""); }}
+            onClick={() => { setModelFilter("all"); setMonthFilter(currentYearMonth()); }}
             className="px-3 py-2.5 text-sm rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
           >
             Clear

@@ -327,9 +327,9 @@ if (pts.length > 0) setMapCenter(pts[pts.length - 1]);
           {/* Summary Metrics */}
           <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100 text-center">
             {[
-              { label: "Visits", value: summaryMetrics.visits || "12" },
-              { label: "Distance", value: `${summaryMetrics.distance || "38"}km` },
-              { label: "Hours", value: `${summaryMetrics.hours || "6.2"}h` },
+              { label: "Visits", value: summaryMetrics.visits },
+              { label: "Distance", value: `${summaryMetrics.distance}km` },
+              { label: "Hours", value: `${summaryMetrics.hours}h` },
             ].map(s => (
               <div key={s.label}>
                 <p className="font-black text-gray-800">{s.value}</p>

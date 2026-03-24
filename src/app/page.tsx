@@ -595,7 +595,7 @@ export default function Home() {
               <span className="text-gray-600 font-light">×</span>
               <Image src={eashwa} width={50} height={50} className="object-contain rounded-md" alt="Chilwee Logo"/>
             </div>
-            <p className="text-gray-400 text-sm leading-relaxed mb-5">
+            <p className="text-white text-sm leading-relaxed mb-5">
               High-performance EV battery solutions for India's growing electric mobility ecosystem.
             </p>
             <div className="flex gap-2">
@@ -607,7 +607,7 @@ export default function Home() {
 
           <div>
             <p className="font-bold text-xs mb-5 text-gray-300 uppercase tracking-[0.2em]">Products</p>
-            <ul className="space-y-3 text-sm text-gray-500">
+            <ul className="space-y-3 text-sm text-white">
               {["48V Battery", "60V Battery", "72V Battery", "E-Scooter Batteries", "E-Rickshaw Batteries"].map((l) => (
                 <li key={l}><a href="#products" className="hover:text-amber-400 transition-colors">{l}</a></li>
               ))}
@@ -616,7 +616,7 @@ export default function Home() {
 
           <div>
             <p className="font-bold text-xs mb-5 text-gray-300 uppercase tracking-[0.2em]">Company</p>
-            <ul className="space-y-3 text-sm text-gray-500">
+            <ul className="space-y-3 text-sm text-white">
               {["About Chilwee", "Technology", "Quality", "Applications", "Blog"].map((l) => (
                 <li key={l}><a href="#about" className="hover:text-amber-400 transition-colors">{l}</a></li>
               ))}
@@ -625,9 +625,9 @@ export default function Home() {
 
           <div>
             <p className="font-bold text-xs mb-5 text-gray-300 uppercase tracking-[0.2em]">Get In Touch</p>
-            <ul className="space-y-3 text-sm text-gray-500">
-              <li className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />support@eashwa.in</li>
-              <li className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />+91 98765 43210</li>
+            <ul className="space-y-3 text-sm text-white">
+              <li className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />ceo@eashwa.com</li>
+              <li className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />+91 77238 66666</li>
               <li className="flex items-start gap-2">
                 <MapPin className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
                 <span>India Operations<br />Authorized Distributor</span>
@@ -636,7 +636,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="border-t border-white/5 max-w-6xl mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-600">
+        <div className="border-t border-white/5 max-w-6xl mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white">
           <p>© {new Date().getFullYear()} Chilwee × E-Ashwa. All rights reserved.</p>
           <div className="flex gap-5">
             <a href="#" className="hover:text-amber-400 transition-colors">Privacy Policy</a>

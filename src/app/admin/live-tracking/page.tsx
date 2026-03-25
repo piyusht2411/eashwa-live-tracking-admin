@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Users, Filter, RefreshCw, Navigation, Loader2 } from "lucide-react";
+import { RefreshCw, Navigation, Loader2 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 import { getLiveLocations, getLocationHistory } from "@/lib/api";
+import { snapRouteToRoads } from "@/lib/osrm";
 import { toast } from "sonner";
 
 const Map = dynamic(() => import("@/components/LiveMap"), { ssr: false });
@@ -41,8 +42,31 @@ export default function LiveTrackingPage() {
   const [locations, setLocations] = useState<LiveLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [routeHistory, setRouteHistory] = useState<{ lat: number, lng: number }[]>([]);
+  const [routePoints, setRoutePoints] = useState<[number, number][]>([]);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeDistanceKm, setRouteDistanceKm] = useState<number | null>(null);
   const token = useSelector((state: RootState) => state.auth.authToken);
+
+  const fetchRoute = async (userId: string) => {
+    if (!token) return;
+    setRouteLoading(true);
+    try {
+      const res = await getLocationHistory(token, userId);
+      const raw: { lat: number; lng: number }[] = res.data?.route || [];
+      if (raw.length < 2) {
+        setRoutePoints(raw.map(p => [p.lat, p.lng]));
+        setRouteDistanceKm(null);
+        return;
+      }
+      const { route, distanceKm } = await snapRouteToRoads(raw);
+      setRoutePoints(route);
+      setRouteDistanceKm(distanceKm > 0 ? distanceKm : null);
+    } catch {
+      toast.error("Could not fetch route history");
+    } finally {
+      setRouteLoading(false);
+    }
+  };
 
   const fetchLocations = async (isRefresh = false) => {
     if (!token) return;
@@ -50,7 +74,7 @@ export default function LiveTrackingPage() {
       if (isRefresh) setRefreshing(true);
       const response = await getLiveLocations(token);
       setLocations(response.data || []);
-    } catch (err: unknown) {
+    } catch {
       if (!isRefresh) toast.error("Failed to load live tracking data");
     } finally {
       setLoading(false);
@@ -60,25 +84,22 @@ export default function LiveTrackingPage() {
 
   useEffect(() => {
     fetchLocations();
-    // Poll every 30 seconds
     const interval = setInterval(() => {
       fetchLocations(true);
-    }, 30000);
+    }, 10000);
     return () => clearInterval(interval);
   }, [token]);
 
+  // Refresh route on every poll when an employee is selected
   useEffect(() => {
     if (!selected || !token) {
-      setRouteHistory([]);
+      setRoutePoints([]);
+      setRouteDistanceKm(null);
       return;
     }
     const emp = locations.find(e => e.id === selected);
-    if (emp) {
-      getLocationHistory(token, emp.userId)
-        .then(res => setRouteHistory(res.data?.route || []))
-        .catch(err => toast.error("Could not fetch route history"));
-    }
-  }, [selected, token]);
+    if (emp) fetchRoute(emp.userId);
+  }, [selected, token, locations]);
 
   const enriched = locations.map((e, i) => ({
     ...e,
@@ -100,9 +121,6 @@ export default function LiveTrackingPage() {
     color: e.userColor,
     popup: `${e.department} · ${e.status} · ${new Date(e.lastUpdate).toLocaleTimeString()}`,
   }));
-
-  // Create polyline format for the Map component (assuming Map supports `route` prop)
-  const routePoints = routeHistory.map(p => [p.lat, p.lng] as [number, number]);
 
   return (
     <div className="flex h-[calc(100vh-0px)] overflow-hidden">
@@ -192,6 +210,16 @@ export default function LiveTrackingPage() {
                     <span>🚗 {emp.speed} km/h</span>
                     <span>🔋 {emp.battery}%</span>
                   </div>
+                  {isSelected && routeDistanceKm !== null && (
+                    <div className="mt-1.5 text-xs text-orange-600 font-semibold">
+                      📍 {routeDistanceKm.toFixed(2)} km today
+                    </div>
+                  )}
+                  {isSelected && routeLoading && (
+                    <div className="mt-1.5 flex items-center gap-1 text-xs text-gray-400">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Snapping route...
+                    </div>
+                  )}
                 </button>
               );
             })

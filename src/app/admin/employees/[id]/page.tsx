@@ -10,6 +10,7 @@ import dynamic from "next/dynamic";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 import { getEmployeeById, getEmployeeLocationHistory, getVisitRecords, getEmployeePerformance, getEmployeeStock } from "@/lib/api";
+import { snapRouteToRoads } from "@/lib/osrm";
 import { toast } from "sonner";
 
 const Map = dynamic(() => import("@/components/LiveMap"), { ssr: false });
@@ -54,6 +55,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
   const [locationRecords, setLocationRecords] = useState<LocationRecord[]>([]);
   const [stockRecords, setStockRecords] = useState<StockSubmission[]>([]);
   const [routePoints, setRoutePoints] = useState<[number, number][]>([]);
+  const [routeDistanceKm, setRouteDistanceKm] = useState<number | null>(null);
 
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
   const [performance, setPerformance] = useState<Record<string, number> | null>(null);
@@ -89,10 +91,15 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
     const fetchRoute = async () => {
       try {
         const res = await getEmployeeLocationHistory(token, id);
-        const route: { lat: number; lng: number; distance: number }[] = res?.data?.route ?? [];
-        const pts: [number, number][] = route.map(p => [p.lat, p.lng]);
-        setRoutePoints(pts);
-if (pts.length > 0) setMapCenter(pts[pts.length - 1]);
+        const raw: { lat: number; lng: number; distance: number }[] = res?.data?.route ?? [];
+        if (raw.length > 0) setMapCenter([raw[raw.length - 1].lat, raw[raw.length - 1].lng]);
+        if (raw.length >= 2) {
+          const { route, distanceKm } = await snapRouteToRoads(raw);
+          setRoutePoints(route);
+          if (distanceKm > 0) setRouteDistanceKm(distanceKm);
+        } else {
+          setRoutePoints(raw.map(p => [p.lat, p.lng]));
+        }
       } catch {
         // silently ignore
       }

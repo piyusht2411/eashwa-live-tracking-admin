@@ -9,7 +9,7 @@ import {
 import dynamic from "next/dynamic";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
-import { getEmployeeById, getEmployeeLocationHistory, getVisitRecords, getEmployeePerformance, getEmployeeStock } from "@/lib/api";
+import { getEmployeeById, getEmployeeLocationHistory, getVisitRecords, getEmployeePerformance, getEmployeeStock, getUserTravelHistory } from "@/lib/api";
 import { snapRouteToRoads } from "@/lib/osrm";
 import { toast } from "sonner";
 
@@ -45,7 +45,7 @@ interface StockSubmission {
   qty: number;
 }
 
-type TabType = "tracking" | "performance" | "stock";
+type TabType = "tracking" | "performance" | "stock" | "travel";
 
 export default function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -65,6 +65,14 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
   const [repeatFilter, setRepeatFilter] = useState(false);
   const [stockMonthFilter, setStockMonthFilter] = useState("");
   const [stockModelFilter, setStockModelFilter] = useState("all");
+
+  // Travel history state
+  const [travelHistory, setTravelHistory] = useState<{ date: string; distanceKm: number }[]>([]);
+  const [travelPagination, setTravelPagination] = useState({ total: 0, page: 1, pages: 1 });
+  const [travelPage, setTravelPage] = useState(1);
+  const [travelFrom, setTravelFrom] = useState("");
+  const [travelTo, setTravelTo] = useState("");
+  const [travelLoading, setTravelLoading] = useState(false);
   const token = useSelector((state: RootState) => state.auth.authToken);
 
   useEffect(() => {
@@ -163,6 +171,29 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
     };
     fetchStock();
   }, [tab, token, id, stockMonthFilter]);
+
+  // Fetch travel history
+  useEffect(() => {
+    if (tab !== "travel" || !token || !id) return;
+    const fetch = async () => {
+      try {
+        setTravelLoading(true);
+        const res = await getUserTravelHistory(token, id, {
+          page: travelPage,
+          limit: 10,
+          from: travelFrom || undefined,
+          to: travelTo || undefined,
+        });
+        setTravelHistory(res.data);
+        setTravelPagination(res.pagination);
+      } catch {
+        setTravelHistory([]);
+      } finally {
+        setTravelLoading(false);
+      }
+    };
+    fetch();
+  }, [tab, token, id, travelPage, travelFrom, travelTo]);
 
   // Filter location records
   const filteredLocations = useMemo(() => locationRecords.filter(r => {
@@ -278,6 +309,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
     { key: "tracking", label: "Visits" },
     { key: "performance", label: "Performance" },
     { key: "stock", label: "Stock Details" },
+    { key: "travel", label: "Travel History" },
   ];
 
   return (
@@ -511,6 +543,89 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
                 <div className="py-16 flex items-center justify-center text-gray-400">
                   <Loader2 className="h-6 w-6 animate-spin text-orange-400 mr-2" />
                   Loading performance data...
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TRAVEL HISTORY TAB */}
+          {tab === "travel" && (
+            <div className="space-y-4">
+              {/* Filters */}
+              <div className="flex flex-wrap gap-3 items-center">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-500 font-medium">From</label>
+                  <input
+                    type="date"
+                    value={travelFrom}
+                    onChange={e => { setTravelFrom(e.target.value); setTravelPage(1); }}
+                    className="px-3 py-2 text-sm rounded-xl border border-gray-200 focus:border-orange-400 outline-none bg-white font-medium text-gray-700"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-500 font-medium">To</label>
+                  <input
+                    type="date"
+                    value={travelTo}
+                    onChange={e => { setTravelTo(e.target.value); setTravelPage(1); }}
+                    className="px-3 py-2 text-sm rounded-xl border border-gray-200 focus:border-orange-400 outline-none bg-white font-medium text-gray-700"
+                  />
+                </div>
+                {(travelFrom || travelTo) && (
+                  <button
+                    onClick={() => { setTravelFrom(""); setTravelTo(""); setTravelPage(1); }}
+                    className="px-3 py-2 text-sm rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+                <span className="ml-auto text-xs text-gray-400">{travelPagination.total} records</span>
+              </div>
+
+              {/* Table */}
+              <div className="overflow-x-auto rounded-xl border border-gray-100">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr className="border-b border-gray-100">
+                      {["Sr. No", "Date", "Distance (km)"].map(h => (
+                        <th key={h} className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {travelLoading ? (
+                      <tr><td colSpan={3} className="py-10 text-center text-gray-400"><Loader2 className="h-5 w-5 animate-spin mx-auto text-orange-400" /></td></tr>
+                    ) : travelHistory.length === 0 ? (
+                      <tr><td colSpan={3} className="py-8 text-center text-sm text-gray-400">No travel history found.</td></tr>
+                    ) : travelHistory.map((r, i) => (
+                      <tr key={r.date} className="border-b border-gray-50 hover:bg-orange-50/20 transition-colors">
+                        <td className="px-4 py-3 text-sm text-gray-500">{(travelPage - 1) * 10 + i + 1}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700">{new Date(r.date).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "2-digit" })}</td>
+                        <td className="px-4 py-3 text-sm font-semibold text-gray-800">{r.distanceKm.toFixed(2)} km</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              {travelPagination.pages > 1 && (
+                <div className="flex items-center justify-between pt-2">
+                  <button
+                    disabled={travelPage <= 1}
+                    onClick={() => setTravelPage(p => p - 1)}
+                    className="px-3 py-1.5 text-sm rounded-xl border border-gray-200 text-gray-600 disabled:opacity-40 hover:border-orange-300 transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-xs text-gray-500">Page {travelPage} of {travelPagination.pages}</span>
+                  <button
+                    disabled={travelPage >= travelPagination.pages}
+                    onClick={() => setTravelPage(p => p + 1)}
+                    className="px-3 py-1.5 text-sm rounded-xl border border-gray-200 text-gray-600 disabled:opacity-40 hover:border-orange-300 transition-colors"
+                  >
+                    Next
+                  </button>
                 </div>
               )}
             </div>

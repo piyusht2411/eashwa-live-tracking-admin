@@ -110,6 +110,28 @@ export async function getEmployeeStock(token: string, id: string, start?: string
   return data;
 }
 
+export async function getUserTravelHistory(
+  token: string,
+  id: string,
+  params: { page?: number; limit?: number; from?: string; to?: string } = {}
+) {
+  const q = new URLSearchParams();
+  if (params.page) q.set("page", String(params.page));
+  if (params.limit) q.set("limit", String(params.limit));
+  if (params.from) q.set("from", params.from);
+  if (params.to) q.set("to", params.to);
+  const res = await fetch(`${API_BASE}/users/${id}/travel-history?${q}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to fetch travel history");
+  return data as {
+    success: boolean;
+    data: { date: string; distanceKm: number }[];
+    pagination: { total: number; page: number; pages: number };
+  };
+}
+
 export async function getEmployeePerformance(token: string, id: string) {
   const res = await fetch(`${API_BASE}/admin/employees/${id}/performance`, {
     headers: { Authorization: `Bearer ${token}` },

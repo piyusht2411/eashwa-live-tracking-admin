@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Flame, Calendar, Users, X, ChevronRight, Loader2 } from "lucide-react";
+import { Flame, Calendar, Users, X, ChevronRight, Loader2, MapPin } from "lucide-react";
 import dynamic from "next/dynamic";
 import { getHeatmapData } from "@/lib/api";
 import { useSelector } from "react-redux";
@@ -15,41 +15,57 @@ interface ZoneEmployee {
 }
 
 interface Zone {
-  name: string;
+  lat: number;
+  lng: number;
+  address: string | null;
   totalVisits: number;
+  uniqueVisitors: number;
   coverage: "High" | "Medium" | "Low";
   color: string;
   employees: ZoneEmployee[];
-  mapPosition: [number, number];
-  radius?: number; // Spread radius in meters
 }
 
-// Mock data removed in favor of API
+const PERIOD_LABELS: Record<string, string> = {
+  today: "Today",
+  week: "This Week",
+  month: "This Month",
+};
+
+const COVERAGE_COLOR: Record<string, string> = {
+  High: "#ef4444",
+  Medium: "#f97316",
+  Low: "#3b82f6",
+};
+
+const COVERAGE_RADIUS: Record<string, number> = {
+  High: 1000,
+  Medium: 700,
+  Low: 400,
+};
 
 export default function HeatMapPage() {
   const [zones, setZones] = useState<Zone[]>([]);
   const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState("week");
+  const [period, setPeriod] = useState("today");
   const [coverageFilter, setCoverageFilter] = useState("all");
-  const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
-   const token = useSelector((state: RootState) => state.auth.authToken);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const token = useSelector((state: RootState) => state.auth.authToken);
 
   useEffect(() => {
     async function fetchData() {
       if (!token) return;
       setLoading(true);
+      setSelectedIndex(null);
       try {
         const res = await getHeatmapData(token, period);
         if (res.success) {
-          // Add default color mapping if backend doesn't provide it
           const dataWithColors = res.data.map((z: any) => ({
             ...z,
             color: z.color || (
               z.coverage === "High" ? "bg-red-100 text-red-700 border-red-200" :
               z.coverage === "Medium" ? "bg-orange-100 text-orange-700 border-orange-200" :
-              "bg-green-100 text-green-700 border-green-200"
+              "bg-blue-100 text-blue-700 border-blue-200"
             ),
-            radius: z.radius || (z.coverage === "High" ? 1000 : z.coverage === "Medium" ? 700 : 400)
           }));
           setZones(dataWithColors);
         }
@@ -60,29 +76,36 @@ export default function HeatMapPage() {
       }
     }
     fetchData();
-  }, [period]);
+  }, [token, period]);
 
   const filteredZones = useMemo(() =>
     zones.filter(z => coverageFilter === "all" || z.coverage.toLowerCase() === coverageFilter),
     [zones, coverageFilter]
   );
 
-  const mapMarkers = filteredZones.map(z => ({
-    position: z.mapPosition,
-    label: z.name,
-    popup: `${z.totalVisits} visits · ${z.coverage} coverage · ${z.employees.length} employee${z.employees.length !== 1 ? "s" : ""}`,
-    color: (z.coverage === "High" ? "#ef4444" : z.coverage === "Medium" ? "#f97316" : "#22c55e") as any,
+  const selectedZone = selectedIndex !== null ? (filteredZones[selectedIndex] ?? null) : null;
+
+  const mapMarkers = filteredZones.map((z, i) => ({
+    position: [z.lat, z.lng] as [number, number],
+    label: z.address || "Unknown Location",
+    popup: `${z.totalVisits} visits · ${z.uniqueVisitors} unique visitor${z.uniqueVisitors !== 1 ? "s" : ""}`,
+    color: COVERAGE_COLOR[z.coverage] ?? "#6b7280",
+    onClick: () => setSelectedIndex(prev => prev === i ? null : i),
   }));
 
   const mapCircles = filteredZones.map(z => ({
-    position: z.mapPosition,
-    radius: z.radius || 500,
-    color: (z.coverage === "High" ? "#ef4444" : z.coverage === "Medium" ? "#f97316" : "#22c55e"),
-    fillOpacity: 0.2,
-    popup: `${z.name}: ${z.coverage} Activity`,
+    position: [z.lat, z.lng] as [number, number],
+    radius: COVERAGE_RADIUS[z.coverage] ?? 500,
+    color: COVERAGE_COLOR[z.coverage] ?? "#6b7280",
+    fillOpacity: 0.18,
+    popup: `${z.address || "Unknown Location"}: ${z.coverage} Activity`,
   }));
 
-  // Unique employees across all zones
+  const mapCenter = useMemo<[number, number]>(
+    () => zones.length > 0 ? [zones[0].lat, zones[0].lng] : [29.96, 77.55],
+    [zones]
+  );
+
   const uniqueEmployees = useMemo(() => {
     const emp = new Set<string>();
     zones.forEach(z => z.employees.forEach(e => emp.add(e.name)));
@@ -95,18 +118,18 @@ export default function HeatMapPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-black text-gray-800">Activity Heat Map</h1>
-          <p className="text-sm text-gray-500">Coverage zone analysis – visit density and employee distribution</p>
+          <p className="text-sm text-gray-500">Most visited locations — visit density and employee breakdown</p>
         </div>
         <div className="flex gap-2">
-          {["today", "week", "month"].map(p => (
+          {(["today", "week", "month"] as const).map(p => (
             <button
               key={p}
               onClick={() => setPeriod(p)}
-              className={`px-4 py-2 text-sm font-semibold rounded-xl transition-all capitalize ${
+              className={`px-4 py-2 text-sm font-semibold rounded-xl transition-all ${
                 period === p ? "bg-orange-500 text-white" : "bg-white border border-gray-200 text-gray-600 hover:border-orange-300"
               }`}
             >
-              {p}
+              {PERIOD_LABELS[p]}
             </button>
           ))}
         </div>
@@ -116,26 +139,26 @@ export default function HeatMapPage() {
       <div className="flex flex-wrap gap-3 items-center">
         <select
           value={coverageFilter}
-          onChange={e => setCoverageFilter(e.target.value)}
+          onChange={e => { setCoverageFilter(e.target.value); setSelectedIndex(null); }}
           className="px-3 py-2 text-sm rounded-xl border border-gray-200 focus:border-orange-400 outline-none bg-white font-medium text-gray-700"
         >
-          <option value="all">All Coverage</option>
-          <option value="high">High Coverage</option>
-          <option value="medium">Medium Coverage</option>
-          <option value="low">Low Coverage</option>
+          <option value="all">All Locations</option>
+          <option value="high">High Activity (50+ visits)</option>
+          <option value="medium">Medium Activity (20–49 visits)</option>
+          <option value="low">Low Activity (3–19 visits)</option>
         </select>
         <div className="flex items-center gap-2 text-xs text-gray-400 ml-auto">
           <Calendar className="h-4 w-4" />
-          Mar 3 – Mar 9, 2026
+          {PERIOD_LABELS[period]}
         </div>
       </div>
 
       {/* Summary */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "High Coverage Zones", value: zones.filter(z => z.coverage === "High").length, note: "Dense activity", color: "bg-red-50 border-red-100 text-red-600" },
-          { label: "Medium Coverage Zones", value: zones.filter(z => z.coverage === "Medium").length, note: "Active zones", color: "bg-orange-50 border-orange-100 text-orange-600" },
-          { label: "Active Employees", value: uniqueEmployees, note: "Across all zones", color: "bg-blue-50 border-blue-100 text-blue-600" },
+          { label: "High Activity Locations", value: zones.filter(z => z.coverage === "High").length, note: "50+ GPS pings", color: "bg-red-50 border-red-100 text-red-600" },
+          { label: "Medium Activity Locations", value: zones.filter(z => z.coverage === "Medium").length, note: "20–49 GPS pings", color: "bg-orange-50 border-orange-100 text-orange-600" },
+          { label: "Active Employees", value: uniqueEmployees, note: "Across all locations", color: "bg-blue-50 border-blue-100 text-blue-600" },
         ].map(s => (
           <div key={s.label} className={`rounded-2xl border p-4 ${s.color}`}>
             <div className="flex items-center gap-2 mb-1">
@@ -153,10 +176,11 @@ export default function HeatMapPage() {
         <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
             <Flame className="h-4 w-4 text-orange-500" />
-            <span className="font-semibold text-sm text-gray-800">Coverage Zone Map</span>
+            <span className="font-semibold text-sm text-gray-800">Activity Map</span>
             <div className="flex items-center gap-3 ml-auto text-xs text-gray-400">
-              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-orange-500" /> High</div>
-              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-green-500" /> Med/Low</div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-red-500" /> High</div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-orange-500" /> Medium</div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-blue-500" /> Low</div>
             </div>
           </div>
           <div className="h-96 relative">
@@ -165,73 +189,75 @@ export default function HeatMapPage() {
                 <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
               </div>
             )}
-            <Map center={[19.12, 72.87]} zoom={11} markers={mapMarkers} circles={mapCircles} height="100%" />
+            <Map center={mapCenter} zoom={12} markers={mapMarkers} circles={mapCircles} height="100%" />
           </div>
           <div className="px-4 py-2.5 bg-orange-50 border-t border-orange-100">
             <p className="text-xs text-orange-600 font-medium flex items-center gap-1.5">
-              <Flame className="h-3.5 w-3.5" />
-              Click a zone in the list to see employee breakdown
+              <MapPin className="h-3.5 w-3.5" />
+              Click a pin on the map or a location in the list to see employee breakdown
             </p>
           </div>
         </div>
 
-        {/* Zone list */}
+        {/* Location list */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
             <Users className="h-4 w-4 text-orange-500" />
-            <span className="font-semibold text-sm text-gray-800">Coverage Zones</span>
+            <span className="font-semibold text-sm text-gray-800">Hot Locations</span>
+            <span className="ml-auto text-xs text-gray-400">{filteredZones.length} spot{filteredZones.length !== 1 ? "s" : ""}</span>
           </div>
           <div className="divide-y divide-gray-50 overflow-y-auto max-h-[400px]">
-            {filteredZones.map((zone, i) => (
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 text-orange-400 animate-spin" />
+              </div>
+            ) : filteredZones.length === 0 ? (
+              <div className="py-10 text-center text-sm text-gray-400">No locations found</div>
+            ) : filteredZones.map((zone, i) => (
               <button
                 key={i}
-                onClick={() => setSelectedZone(selectedZone?.name === zone.name ? null : zone)}
-                className={`w-full flex items-center justify-between px-4 py-3 hover:bg-orange-50/30 transition-colors text-left ${selectedZone?.name === zone.name ? "bg-orange-50" : ""}`}
+                onClick={() => setSelectedIndex(selectedIndex === i ? null : i)}
+                className={`w-full flex items-center justify-between px-4 py-3 hover:bg-orange-50/30 transition-colors text-left ${selectedIndex === i ? "bg-orange-50" : ""}`}
               >
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-semibold text-gray-800">{zone.name}</p>
-                    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${zone.color}`}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1 gap-2">
+                    <p className="text-sm font-semibold text-gray-800 truncate">
+                      {zone.address || `${zone.lat.toFixed(4)}, ${zone.lng.toFixed(4)}`}
+                    </p>
+                    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border flex-shrink-0 ${zone.color}`}>
                       {zone.coverage}
                     </span>
                   </div>
-                  <div className="flex flex-col gap-1 mt-1">
-                    <div className="flex items-center gap-3 text-xs text-gray-400">
-                      <span className="flex items-center gap-1">
-                        <Flame className="h-3 w-3 text-orange-400" /> {zone.totalVisits} total visits
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Users className="h-3 w-3 text-gray-400" /> {zone.employees.length} employees
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-purple-500 font-medium">
-                        Same: {Math.max(...zone.employees.map(e => e.visits))} visits
-                      </span>
-                      <span className="text-gray-300">·</span>
-                      <span className="text-blue-500 font-medium">
-                        Diff: {zone.employees.length} employees
-                      </span>
-                    </div>
+                  <div className="flex items-center gap-3 text-xs text-gray-400">
+                    <span className="flex items-center gap-1">
+                      <Flame className="h-3 w-3 text-orange-400" /> {zone.totalVisits} visits
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Users className="h-3 w-3 text-gray-400" /> {zone.uniqueVisitors} people
+                    </span>
                   </div>
                 </div>
-                <ChevronRight className={`h-4 w-4 text-gray-300 ml-2 flex-shrink-0 transition-transform ${selectedZone?.name === zone.name ? "rotate-90 text-orange-400" : ""}`} />
+                <ChevronRight className={`h-4 w-4 text-gray-300 ml-2 flex-shrink-0 transition-transform ${selectedIndex === i ? "rotate-90 text-orange-400" : ""}`} />
               </button>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Zone Detail Drawer */}
+      {/* Location Detail Drawer */}
       {selectedZone && (
         <div className="bg-white rounded-2xl border border-orange-200 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-orange-100 bg-orange-50 flex items-center justify-between">
             <div>
-              <p className="font-bold text-gray-800">{selectedZone.name} – Employee Breakdown</p>
-              <p className="text-xs text-gray-500 mt-0.5">{selectedZone.totalVisits} total visits · {selectedZone.employees.length} employees</p>
+              <p className="font-bold text-gray-800">
+                {selectedZone.address || `${selectedZone.lat.toFixed(4)}, ${selectedZone.lng.toFixed(4)}`}
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {selectedZone.totalVisits} total visits · {selectedZone.uniqueVisitors} unique visitor{selectedZone.uniqueVisitors !== 1 ? "s" : ""}
+              </p>
             </div>
             <button
-              onClick={() => setSelectedZone(null)}
+              onClick={() => setSelectedIndex(null)}
               className="p-1.5 rounded-lg hover:bg-orange-100 text-gray-500 transition-colors"
             >
               <X className="h-4 w-4" />
@@ -239,17 +265,17 @@ export default function HeatMapPage() {
           </div>
           <div className="p-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {selectedZone.employees.sort((a, b) => b.visits - a.visits).map((emp, i) => {
+              {[...selectedZone.employees].sort((a, b) => b.visits - a.visits).map((emp, i) => {
                 const pct = Math.round((emp.visits / selectedZone.totalVisits) * 100);
                 return (
                   <div key={i} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-sm flex-shrink-0">
-                        {emp.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                        {emp.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-sm text-gray-800 truncate">{emp.name}</p>
-                        <p className="text-xs text-gray-400">{emp.visits} visits · {pct}% of zone</p>
+                        <p className="text-xs text-gray-400">{emp.visits} visits · {pct}% of location</p>
                       </div>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-1.5">
@@ -261,8 +287,12 @@ export default function HeatMapPage() {
             </div>
             <div className="mt-4 pt-4 border-t border-gray-100">
               <p className="text-xs text-gray-400">
-                <span className="font-medium text-gray-600">{selectedZone.employees.length} employee{selectedZone.employees.length !== 1 ? "s" : ""}</span> visited this zone,&nbsp;
-                <span className="font-medium text-gray-600">{selectedZone.employees.filter(e => e.visits > 3).length}</span> with repeated activity (3+ visits).
+                <span className="font-medium text-gray-600">
+                  {selectedZone.uniqueVisitors} person{selectedZone.uniqueVisitors !== 1 ? "s" : ""}
+                </span> visited this location during {PERIOD_LABELS[period].toLowerCase()},&nbsp;
+                <span className="font-medium text-gray-600">
+                  {selectedZone.employees.filter(e => e.visits > 3).length}
+                </span> with repeated activity (3+ visits).
               </p>
             </div>
           </div>

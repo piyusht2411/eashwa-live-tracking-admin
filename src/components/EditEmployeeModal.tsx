@@ -2,6 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { X, User, Mail, Lock, Phone, Briefcase, Hash, MapPin, CreditCard, Calendar, UserCheck, ChevronDown, Loader2, Upload } from "lucide-react";
+
+const MAP_COLOR_PALETTE = [
+  "#E63946", "#2196F3", "#4CAF50", "#FF9800", "#9C27B0",
+  "#00BCD4", "#F44336", "#3F51B5", "#8BC34A", "#FF5722",
+  "#607D8B", "#E91E63", "#009688", "#FFC107", "#673AB7",
+  "#03A9F4", "#CDDC39", "#FF4081", "#00ACC1", "#7B1FA2",
+];
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 import { getEmployeeById, updateEmployee, fetchAdminsAndManagers } from "@/lib/api";
@@ -62,6 +69,7 @@ export default function EditEmployeeModal({ open, employeeId, onClose, onSuccess
           homeLat: data.homeLocation?.lat != null ? String(data.homeLocation.lat) : "",
           homeLng: data.homeLocation?.lng != null ? String(data.homeLocation.lng) : "",
           homeAddress: data.homeLocation?.address || "",
+          mapColor: data.mapColor || "",
         });
         setExistingImage(data.profilePicture || "");
       } catch {
@@ -352,6 +360,36 @@ export default function EditEmployeeModal({ open, employeeId, onClose, onSuccess
                 />
               </div>
             </div>
+          </div>
+
+          {/* Map Marker Color */}
+          <div className="pt-4 border-t border-gray-200">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Map Marker Color <span className="text-gray-400 text-xs font-normal">(auto-assigned if not set)</span>
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {MAP_COLOR_PALETTE.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => set("mapColor", form.mapColor === color ? "" : color)}
+                  className="w-7 h-7 rounded-full border-2 transition-transform hover:scale-110"
+                  style={{
+                    background: color,
+                    borderColor: form.mapColor === color ? "#1f2937" : "transparent",
+                    boxShadow: form.mapColor === color ? "0 0 0 2px white inset" : "none",
+                  }}
+                  title={color}
+                />
+              ))}
+            </div>
+            {form.mapColor && (
+              <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full inline-block" style={{ background: form.mapColor }} />
+                Selected: {form.mapColor}
+                <button type="button" onClick={() => set("mapColor", "")} className="text-red-400 hover:text-red-600 ml-1">✕ clear</button>
+              </p>
+            )}
           </div>
 
           {/* Submit Buttons */}

@@ -46,6 +46,7 @@ interface MarkerData {
   label: string;
   color?: string; // hex color
   popup?: string;
+  onClick?: () => void;
 }
 
 interface CircleData {
@@ -92,6 +93,7 @@ export default function LiveMap({
           key={i}
           position={m.position}
           icon={createColorIcon(m.color ?? "#6b7280")}
+          eventHandlers={m.onClick ? { click: m.onClick } : undefined}
         >
           <Popup>
             <div className="font-semibold text-sm">{m.label}</div>

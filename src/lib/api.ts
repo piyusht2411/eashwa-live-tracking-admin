@@ -29,6 +29,7 @@ export interface RegisterEmployeePayload {
   homeLat?: number
   homeLng?: number
   homeAddress?: string
+  mapColor?: string
 }
 
 export async function registerEmployee(
@@ -57,6 +58,7 @@ export async function registerEmployee(
   if (payload.homeLat !== undefined) formData.append("homeLat", payload.homeLat.toFixed(7));
   if (payload.homeLng !== undefined) formData.append("homeLng", payload.homeLng.toFixed(7));
   if (payload.homeAddress) formData.append("homeAddress", payload.homeAddress);
+  if (payload.mapColor) formData.append("mapColor", payload.mapColor);
 
   if (profilePictureFile) {
     formData.append("profilePicture", profilePictureFile);

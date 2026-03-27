@@ -35,6 +35,7 @@ export interface LiveLocation {
   battery: number;
   speed: number;
   status: "active" | "idle" | "break" | "offline" | string;
+  mapColor?: string;
 }
 
 export default function LiveTrackingPage() {
@@ -103,7 +104,7 @@ export default function LiveTrackingPage() {
 
   const enriched = locations.map((e, i) => ({
     ...e,
-    userColor: USER_COLORS[i % USER_COLORS.length],
+    userColor: e.mapColor || USER_COLORS[i % USER_COLORS.length],
   }));
 
   const filtered = enriched;
@@ -210,11 +211,11 @@ export default function LiveTrackingPage() {
                     <span>🚗 {emp.speed} km/h</span>
                     <span>🔋 {emp.battery}%</span>
                   </div>
-                  {isSelected && routeDistanceKm !== null && (
+                  {/* {isSelected && routeDistanceKm !== null && (
                     <div className="mt-1.5 text-xs text-orange-600 font-semibold">
                       📍 {routeDistanceKm.toFixed(2)} km today
                     </div>
-                  )}
+                  )} */}
                   {isSelected && routeLoading && (
                     <div className="mt-1.5 flex items-center gap-1 text-xs text-gray-400">
                       <Loader2 className="h-3 w-3 animate-spin" /> Snapping route...

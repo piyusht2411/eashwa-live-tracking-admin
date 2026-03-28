@@ -198,7 +198,7 @@ export default function GeoFencingPage() {
                   center={mapCenter}
                   zoom={13}
                   markers={markers}
-                  autoFit={markers.length > 1}
+                  autoFit={false}
                   height="100%"
                 />
               )}

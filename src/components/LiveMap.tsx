@@ -33,11 +33,11 @@ function FitBounds({ markers }: { markers: MarkerData[] }) {
   return null;
 }
 
-function MapRecenter({ center }: { center: [number, number] }) {
+function MapRecenter({ center, zoom }: { center: [number, number]; zoom?: number }) {
   const map = useMap();
   useEffect(() => {
-    map.setView(center);
-  }, [center, map]);
+    map.setView(center, zoom);
+  }, [center, zoom, map]);
   return null;
 }
 
@@ -87,7 +87,7 @@ export default function LiveMap({
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      {autoFit ? <FitBounds markers={markers} /> : <MapRecenter center={center} />}
+      {autoFit ? <FitBounds markers={markers} /> : <MapRecenter center={center} zoom={zoom} />}
       {markers.map((m, i) => (
         <Marker
           key={i}

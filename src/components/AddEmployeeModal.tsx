@@ -32,14 +32,18 @@ interface Props {
 interface AdminOrManager {
   id: string;
   name: string;
+  role: string;
 }
 
 const ROLES = [
   { value: "employee", label: "Employee" },
   { value: "hr", label: "HR" },
   { value: "manager", label: "Manager" },
+  { value: "super_manager", label: "Super Manager" },
   { value: "admin", label: "Admin" },
 ];
+
+const EMPLOYEE_TYPE_ROLES = ["employee", "manager", "hr"];
 
 const MAP_COLOR_PALETTE = [
   "#E63946", "#2196F3", "#4CAF50", "#FF9800", "#9C27B0",
@@ -61,6 +65,7 @@ const initialForm: Omit<RegisterEmployeePayload, "joiningDate" | "homeLat" | "ho
   phone: "",
   department: "Sales",
   role: "employee",
+  employeeType: "asm" as "asm" | "office" | "both",
   employeeId: "",
   post: "",
   address: "",
@@ -158,6 +163,7 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
         phone: form.phone,
         department: "Sales",
         role: form.role,
+        ...(form.role === "employee" && { employeeType: form.employeeType }),
         ...(form.employeeId && { employeeId: form.employeeId }),
         ...(form.post && { post: form.post }),
         ...(form.address && { address: form.address }),
@@ -354,7 +360,7 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
                       required
                       value={form.role}
                       onChange={(e) =>
-                        updateForm("role", e.target.value as "admin" | "hr" | "manager" | "employee")
+                        updateForm("role", e.target.value as "admin" | "super_manager" | "hr" | "manager" | "employee")
                       }
                       className={inputClass + " appearance-none pr-8"}
                     >
@@ -367,6 +373,26 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
                   </div>
                 </div>
+
+                {form.role === "employee" && (
+                  <div>
+                    <label className={labelClass}>Employee Type *</label>
+                    <div className="relative">
+                      <UserCheck className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <select
+                        required
+                        value={form.employeeType}
+                        onChange={(e) => updateForm("employeeType", e.target.value as "asm" | "office" | "both")}
+                        className={inputClass + " appearance-none pr-8"}
+                      >
+                        <option value="asm">ASM (Field)</option>
+                        <option value="office">Office</option>
+                        <option value="both">Both (ASM + Office)</option>
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                    </div>
+                  </div>
+                )}
 
                 <button
                   type="button"
@@ -433,17 +459,28 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
                       className={inputClass + " appearance-none pr-8"}
                       disabled={fetchingManagers}
                     >
-                      <option value="">Select a manager or admin</option>
+                      <option value="">Select a manager</option>
                       {fetchingManagers ? (
                         <option value="" disabled>
                           Loading...
                         </option>
                       ) : (
-                        adminsAndManagers.map((mgr) => (
-                          <option key={mgr.id} value={mgr.id}>
-                            {mgr.name}
-                          </option>
-                        ))
+                        <>
+                          {adminsAndManagers.filter(m => m.role === "super_manager").length > 0 && (
+                            <optgroup label="Super Managers">
+                              {adminsAndManagers.filter(m => m.role === "super_manager").map((mgr) => (
+                                <option key={mgr.id} value={mgr.id}>{mgr.name}</option>
+                              ))}
+                            </optgroup>
+                          )}
+                          {adminsAndManagers.filter(m => m.role === "manager").length > 0 && (
+                            <optgroup label="Managers">
+                              {adminsAndManagers.filter(m => m.role === "manager").map((mgr) => (
+                                <option key={mgr.id} value={mgr.id}>{mgr.name}</option>
+                              ))}
+                            </optgroup>
+                          )}
+                        </>
                       )}
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />

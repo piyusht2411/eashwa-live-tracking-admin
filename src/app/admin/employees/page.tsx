@@ -25,6 +25,8 @@ export interface Employee {
   location?: string;
   punchIn?: string;
   profilePicture?: string;
+  employeeType?: "asm" | "office" | "both";
+  activeMode?: "asm" | "office" | null;
 }
 
 const statusConfig: Record<string, { label: string; color: string; dot: string }> = {
@@ -169,7 +171,13 @@ export default function EmployeesPage() {
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      {emp.activeMode === "asm" && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">Field</span>
+                      )}
+                      {emp.activeMode === "office" && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Office</span>
+                      )}
                       <div className={`w-2 h-2 rounded-full ${sc.dot}`} />
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${sc.color}`}>{sc.label}</span>
                     </div>

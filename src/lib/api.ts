@@ -19,7 +19,8 @@ export interface RegisterEmployeePayload {
   password: string;
   phone: string;
   department: string;
-  role: "admin" | "hr" | "manager" | "employee";
+  role: "admin" | "super_manager" | "hr" | "manager" | "employee";
+  employeeType?: "asm" | "office" | "both";
   employeeId?: string;
   post?: string;
   address?: string;
@@ -52,6 +53,7 @@ export async function registerEmployee(
   if (payload.aadhaarNumber !== undefined && payload.aadhaarNumber !== null) {
     formData.append("aadhaarNumber", payload.aadhaarNumber.toString());
   }
+  if (payload.employeeType) formData.append("employeeType", payload.employeeType);
   if (payload.managerId) formData.append("managerId", payload.managerId);
   if (payload.joiningDate) formData.append("joiningDate", payload.joiningDate);
 
@@ -191,7 +193,16 @@ export async function getAttendance(token: string, params: Record<string, string
   return data;
 }
 
-export async function createLeave(token: string, payload: { userId: string; type: string; date: string; reason?: string }) {
+export async function createLeave(
+  token: string,
+  payload: {
+    userId?: string;
+    type: "casual" | "short" | "half_day";
+    date: string;
+    shortLeaveDuration?: 1 | 2;
+    reason?: string;
+  }
+) {
   const res = await fetch(`${API_BASE}/leaves`, {
     method: "POST",
     headers: {
@@ -514,5 +525,59 @@ export async function getHeatmapData(token: string, period = "today") {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Failed to fetch heatmap data');
+  return data;
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+export async function getUserNotifications(
+  token: string,
+  userId: string,
+  params: { from?: string; to?: string; type?: string; page?: number; limit?: number } = {}
+) {
+  const q = new URLSearchParams();
+  if (params.from) q.set("from", params.from);
+  if (params.to) q.set("to", params.to);
+  if (params.type) q.set("type", params.type);
+  if (params.page) q.set("page", String(params.page));
+  if (params.limit) q.set("limit", String(params.limit));
+  const res = await fetch(`${API_BASE}/notifications/user/${userId}?${q}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to fetch notifications");
+  return data as {
+    success: boolean;
+    unreadCount: number;
+    data: {
+      _id: string;
+      title: string;
+      body: string;
+      type: string;
+      data: Record<string, unknown>;
+      read: boolean;
+      createdAt: string;
+    }[];
+    pagination: { total: number; page: number; pages: number; limit: number };
+  };
+}
+
+export async function markNotificationRead(token: string, notifId: string) {
+  const res = await fetch(`${API_BASE}/notifications/${notifId}/read`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to mark notification as read");
+  return data;
+}
+
+export async function markAllNotificationsRead(token: string) {
+  const res = await fetch(`${API_BASE}/notifications/read-all`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to mark all notifications as read");
   return data;
 }

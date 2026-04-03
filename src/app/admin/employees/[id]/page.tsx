@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, use } from "react";
-import { ArrowLeft, MapPin, Phone, Clock, TrendingUp, Shield, Briefcase, Calendar, Loader2, Download, Package } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, Clock, TrendingUp, Shield, Briefcase, Calendar, Loader2, Download, Package, Bell, CheckCheck } from "lucide-react";
 import Link from "next/link";
 import {
   RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -9,7 +9,7 @@ import {
 import dynamic from "next/dynamic";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
-import { getEmployeeById, getEmployeeLocationHistory, getVisitRecords, getEmployeePerformance, getEmployeeStock, getUserTravelHistory } from "@/lib/api";
+import { getEmployeeById, getEmployeeLocationHistory, getVisitRecords, getEmployeePerformance, getEmployeeStock, getUserTravelHistory, getUserNotifications, markNotificationRead, markAllNotificationsRead } from "@/lib/api";
 import { snapRouteToRoads } from "@/lib/osrm";
 import { toast } from "sonner";
 
@@ -45,7 +45,17 @@ interface StockSubmission {
   qty: number;
 }
 
-type TabType = "tracking" | "performance" | "stock" | "travel";
+type TabType = "tracking" | "performance" | "stock" | "travel" | "notifications";
+
+interface Notification {
+  _id: string;
+  title: string;
+  body: string;
+  type: string;
+  data: Record<string, unknown>;
+  read: boolean;
+  createdAt: string;
+}
 
 export default function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -73,6 +83,17 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
   const [travelFrom, setTravelFrom] = useState("");
   const [travelTo, setTravelTo] = useState("");
   const [travelLoading, setTravelLoading] = useState(false);
+
+  // Notifications state
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifUnreadCount, setNotifUnreadCount] = useState(0);
+  const [notifPagination, setNotifPagination] = useState({ total: 0, page: 1, pages: 1, limit: 20 });
+  const [notifPage, setNotifPage] = useState(1);
+  const [notifFrom, setNotifFrom] = useState("");
+  const [notifTo, setNotifTo] = useState("");
+  const [notifType, setNotifType] = useState("");
+  const [notifLoading, setNotifLoading] = useState(false);
+
   const token = useSelector((state: RootState) => state.auth.authToken);
 
   useEffect(() => {
@@ -171,6 +192,31 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
     };
     fetchStock();
   }, [tab, token, id, stockMonthFilter]);
+
+  // Fetch notifications
+  useEffect(() => {
+    if (tab !== "notifications" || !token || !id) return;
+    const fetchNotifs = async () => {
+      try {
+        setNotifLoading(true);
+        const res = await getUserNotifications(token, id, {
+          page: notifPage,
+          limit: 20,
+          from: notifFrom || undefined,
+          to: notifTo || undefined,
+          type: notifType || undefined,
+        });
+        setNotifications(res.data);
+        setNotifUnreadCount(res.unreadCount);
+        setNotifPagination(res.pagination);
+      } catch {
+        setNotifications([]);
+      } finally {
+        setNotifLoading(false);
+      }
+    };
+    fetchNotifs();
+  }, [tab, token, id, notifPage, notifFrom, notifTo, notifType]);
 
   // Fetch travel history
   useEffect(() => {
@@ -305,11 +351,34 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
   const mockLocation = emp.location || "Office";
   const resolvedMapCenter: [number, number] = mapCenter ?? emp.currentLocation ?? [29.9352, 77.5666];
 
+  const handleMarkRead = async (notifId: string) => {
+    if (!token) return;
+    try {
+      await markNotificationRead(token, notifId);
+      setNotifications(prev => prev.map(n => n._id === notifId ? { ...n, read: true } : n));
+      setNotifUnreadCount(prev => Math.max(0, prev - 1));
+    } catch {
+      toast.error("Failed to mark as read");
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    if (!token) return;
+    try {
+      await markAllNotificationsRead(token);
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      setNotifUnreadCount(0);
+    } catch {
+      toast.error("Failed to mark all as read");
+    }
+  };
+
   const tabs: { key: TabType; label: string }[] = [
     { key: "tracking", label: "Visits" },
     { key: "performance", label: "Performance" },
     { key: "stock", label: "Stock Details" },
     { key: "travel", label: "Travel History" },
+    { key: "notifications", label: "Notifications" },
   ];
 
   return (
@@ -622,6 +691,128 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
                   <button
                     disabled={travelPage >= travelPagination.pages}
                     onClick={() => setTravelPage(p => p + 1)}
+                    className="px-3 py-1.5 text-sm rounded-xl border border-gray-200 text-gray-600 disabled:opacity-40 hover:border-orange-300 transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* NOTIFICATIONS TAB */}
+          {tab === "notifications" && (
+            <div className="space-y-4">
+              {/* Header row */}
+              <div className="flex flex-wrap gap-3 items-center">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-500 font-medium">From</label>
+                  <input
+                    type="date"
+                    value={notifFrom}
+                    onChange={e => { setNotifFrom(e.target.value); setNotifPage(1); }}
+                    className="px-3 py-2 text-sm rounded-xl border border-gray-200 focus:border-orange-400 outline-none bg-white font-medium text-gray-700"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-500 font-medium">To</label>
+                  <input
+                    type="date"
+                    value={notifTo}
+                    onChange={e => { setNotifTo(e.target.value); setNotifPage(1); }}
+                    className="px-3 py-2 text-sm rounded-xl border border-gray-200 focus:border-orange-400 outline-none bg-white font-medium text-gray-700"
+                  />
+                </div>
+                <select
+                  value={notifType}
+                  onChange={e => { setNotifType(e.target.value); setNotifPage(1); }}
+                  className="px-3 py-2 text-sm rounded-xl border border-gray-200 focus:border-orange-400 outline-none bg-white font-medium text-gray-700"
+                >
+                  <option value="">All Types</option>
+                  <option value="leave_request">Leave Request</option>
+                  <option value="leave_approved">Leave Approved</option>
+                  <option value="leave_rejected">Leave Rejected</option>
+                  <option value="mode_switch">Mode Switch</option>
+                  <option value="general">General</option>
+                </select>
+                {(notifFrom || notifTo || notifType) && (
+                  <button
+                    onClick={() => { setNotifFrom(""); setNotifTo(""); setNotifType(""); setNotifPage(1); }}
+                    className="px-3 py-2 text-sm rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+                <div className="ml-auto flex items-center gap-3">
+                  {notifUnreadCount > 0 && (
+                    <span className="text-xs bg-orange-100 text-orange-600 font-semibold px-2 py-1 rounded-full">
+                      {notifUnreadCount} unread
+                    </span>
+                  )}
+                  {notifUnreadCount > 0 && (
+                    <button
+                      onClick={handleMarkAllRead}
+                      className="flex items-center gap-1.5 px-3 py-2 text-xs rounded-xl border border-gray-200 text-gray-600 hover:bg-orange-50 hover:border-orange-300 transition-colors"
+                    >
+                      <CheckCheck className="h-3.5 w-3.5" /> Mark all read
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* List */}
+              <div className="space-y-2">
+                {notifLoading ? (
+                  <div className="py-10 flex items-center justify-center text-gray-400">
+                    <Loader2 className="h-5 w-5 animate-spin text-orange-400 mr-2" />
+                  </div>
+                ) : notifications.length === 0 ? (
+                  <div className="py-10 text-center text-sm text-gray-400">
+                    <Bell className="h-6 w-6 mx-auto mb-2 opacity-40" />
+                    No notifications found.
+                  </div>
+                ) : notifications.map(n => (
+                  <div
+                    key={n._id}
+                    className={`flex items-start gap-3 p-4 rounded-xl border transition-colors ${n.read ? "bg-white border-gray-100" : "bg-orange-50/60 border-orange-200"}`}
+                  >
+                    <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${n.read ? "bg-gray-300" : "bg-orange-500"}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className={`text-sm font-semibold ${n.read ? "text-gray-700" : "text-gray-900"}`}>{n.title}</p>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">{n.type.replace(/_/g, " ")}</span>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-0.5">{n.body}</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {new Date(n.createdAt).toLocaleString("en-IN", { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: true })}
+                      </p>
+                    </div>
+                    {!n.read && (
+                      <button
+                        onClick={() => handleMarkRead(n._id)}
+                        className="flex-shrink-0 text-xs text-orange-500 hover:text-orange-700 font-medium transition-colors"
+                      >
+                        Mark read
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {notifPagination.pages > 1 && (
+                <div className="flex items-center justify-between pt-2">
+                  <button
+                    disabled={notifPage <= 1}
+                    onClick={() => setNotifPage(p => p - 1)}
+                    className="px-3 py-1.5 text-sm rounded-xl border border-gray-200 text-gray-600 disabled:opacity-40 hover:border-orange-300 transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-xs text-gray-500">Page {notifPage} of {notifPagination.pages} · {notifPagination.total} total</span>
+                  <button
+                    disabled={notifPage >= notifPagination.pages}
+                    onClick={() => setNotifPage(p => p + 1)}
                     className="px-3 py-1.5 text-sm rounded-xl border border-gray-200 text-gray-600 disabled:opacity-40 hover:border-orange-300 transition-colors"
                   >
                     Next

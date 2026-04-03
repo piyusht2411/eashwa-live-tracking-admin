@@ -25,6 +25,7 @@ const ROLES = [
   { value: "employee", label: "Employee" },
   { value: "hr", label: "HR" },
   { value: "manager", label: "Manager" },
+  { value: "super_manager", label: "Super Manager" },
   { value: "admin", label: "Admin" },
 ];
 
@@ -70,6 +71,7 @@ export default function EditEmployeeModal({ open, employeeId, onClose, onSuccess
           homeLng: data.homeLocation?.lng != null ? String(data.homeLocation.lng) : "",
           homeAddress: data.homeLocation?.address || "",
           mapColor: data.mapColor || "",
+          employeeType: data.employeeType || "asm",
         });
         setExistingImage(data.profilePicture || "");
       } catch {
@@ -251,6 +253,21 @@ export default function EditEmployeeModal({ open, employeeId, onClose, onSuccess
             </div>
           </div>
 
+          {form.role === "employee" && (
+            <div>
+              <label className={labelClass}>Employee Type *</label>
+              <div className="relative">
+                <UserCheck className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <select required value={form.employeeType || "asm"} onChange={(e) => set("employeeType", e.target.value)} className={inputClass + " appearance-none pr-8"}>
+                  <option value="asm">ASM (Field)</option>
+                  <option value="office">Office</option>
+                  <option value="both">Both (ASM + Office)</option>
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
+          )}
+
           {/* Additional Info */}
           <div>
             <label className={labelClass}>Employee ID</label>
@@ -281,10 +298,21 @@ export default function EditEmployeeModal({ open, employeeId, onClose, onSuccess
             <div className="relative">
               <UserCheck className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <select value={form.managerId || ""} onChange={(e) => set("managerId", e.target.value)} className={inputClass + " appearance-none pr-8"} disabled={fetchingManagers}>
-                <option value="">Select a manager or admin</option>
-                {adminsAndManagers.map((mgr) => (
-                  <option key={mgr.id} value={mgr.id}>{mgr.name}</option>
-                ))}
+                <option value="">Select a manager</option>
+                {adminsAndManagers.filter((m: any) => m.role === "super_manager").length > 0 && (
+                  <optgroup label="Super Managers">
+                    {adminsAndManagers.filter((m: any) => m.role === "super_manager").map((mgr: any) => (
+                      <option key={mgr.id} value={mgr.id}>{mgr.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {adminsAndManagers.filter((m: any) => m.role === "manager").length > 0 && (
+                  <optgroup label="Managers">
+                    {adminsAndManagers.filter((m: any) => m.role === "manager").map((mgr: any) => (
+                      <option key={mgr.id} value={mgr.id}>{mgr.name}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
             </div>

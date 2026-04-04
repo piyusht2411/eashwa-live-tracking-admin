@@ -10,9 +10,9 @@ import { toast } from "sonner";
 import { Eye, EyeOff, Loader2, MapPin, Shield } from "lucide-react";
 
 const DEMO_CREDENTIALS = [
-  { label: "admin", userName: "admin@eashwa.in", password: "admin123" },
-  { label: "hr", userName: "hr@eashwa.in", password: "hr123" },
-  { label: "manager", userName: "manager@eashwa.in", password: "manager123" },
+  { label: "admin", userName: "admin@ .in", password: "admin123" },
+  { label: "hr", userName: "hr@ .in", password: "hr123" },
+  { label: "manager", userName: "manager@ .in", password: "manager123" },
 ];
 
 export default function LoginPage() {
@@ -78,7 +78,7 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-500 rounded-2xl shadow-lg shadow-orange-200 mb-4">
             <MapPin className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-3xl font-black text-gray-800">Eashwa</h1>
+          <h1 className="text-3xl font-black text-gray-800"> </h1>
           <p className="text-orange-600 font-semibold text-sm uppercase tracking-widest mt-1">
             Live Tracking Admin
           </p>
@@ -168,7 +168,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">
-          © 2025 Eashwa Live Tracking. All rights reserved.
+          © 2025   Live Tracking. All rights reserved.
         </p>
       </div>
     </div>

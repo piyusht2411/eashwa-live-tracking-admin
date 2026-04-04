@@ -242,11 +242,10 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
             <button
               key={s.num}
               onClick={() => setStep(s.num as 1 | 2)}
-              className={`flex-1 py-3 text-sm font-semibold transition-colors ${
-                step === s.num
+              className={`flex-1 py-3 text-sm font-semibold transition-colors ${step === s.num
                   ? "text-orange-600 border-b-2 border-orange-500 bg-orange-50/50"
                   : "text-gray-400 hover:text-gray-600"
-              }`}
+                }`}
             >
               {s.num}. {s.label}
             </button>
@@ -307,7 +306,7 @@ export default function AddEmployeeModal({ open, onClose, onSuccess }: Props) {
                     <input
                       type="email"
                       required
-                      placeholder="employee@eashwa.in"
+                      placeholder="employee@ .in"
                       value={form.email}
                       onChange={(e) => updateForm("email", e.target.value)}
                       className={inputClass}

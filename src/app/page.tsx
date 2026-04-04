@@ -27,12 +27,12 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import chiwee from "../../public/images/chiwee logo.jpg"
-import eashwa from "../../public/images/logo.png"
+import from "../../public/images/logo.png"
 
 /* ─────────────────────────────────────────────
    PLACEHOLDER LOGOS
    Replace with <img src="/logos/chilwee.png" />
-   and <img src="/logos/eashwa.png" /> once ready
+   and <img src="/logos/ .png" /> once ready
 ───────────────────────────────────────────── */
 function ChilweeLogo({ size = 40 }: { size?: number }) {
   return (
@@ -45,7 +45,7 @@ function ChilweeLogo({ size = 40 }: { size?: number }) {
   );
 }
 
-function EAshwaLogo({ size = 40 }: { size?: number }) {
+function Logo({ size = 40 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect width="44" height="44" rx="11" fill="#f59e0b" />
@@ -154,14 +154,14 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           {/* Dual logo */}
           <div className="flex items-center gap-2.5">
-            <Image src={chiwee} width={50} height={50} className="object-contain rounded-md" alt="Chilwee Logo"/>
+            <Image src={chiwee} width={50} height={50} className="object-contain rounded-md" alt="Chilwee Logo" />
             <span className="text-gray-300 font-light text-lg select-none">×</span>
-            <Image src={eashwa} width={50} height={50} className="object-contain rounded-md" alt="Chilwee Logo"/>
+            <Image src={ } width={50} height={50} className="object-contain rounded-md" alt="Chilwee Logo" />
             <div className="hidden sm:flex items-center gap-2 ml-1">
               <div className="h-5 w-px bg-gray-200" />
               <span className="font-extrabold text-gray-900 text-sm tracking-tight">Chilwee</span>
               <span className="text-amber-500 font-black text-sm">×</span>
-              <span className="font-extrabold text-amber-500 text-sm tracking-tight">E-Ashwa</span>
+              <span className="font-extrabold text-amber-500 text-sm tracking-tight"> </span>
             </div>
           </div>
 
@@ -327,7 +327,7 @@ export default function Home() {
             {/* Chilwee brand block */}
             <div className="flex flex-col items-center gap-4">
               <div className="w-20 h-20 rounded-2xl bg-green-600 flex items-center justify-center shadow-lg shadow-green-200">
-                <Image src={chiwee} width={100} height={100} className="object-contain rounded-md" alt="Chilwee Logo"/>
+                <Image src={chiwee} width={100} height={100} className="object-contain rounded-md" alt="Chilwee Logo" />
               </div>
               <div>
                 <p className="font-extrabold text-gray-900 text-2xl tracking-tight">Chilwee</p>
@@ -342,13 +342,13 @@ export default function Home() {
               <div className="w-14 h-px sm:w-px sm:h-14 bg-gradient-to-r sm:bg-gradient-to-b from-transparent via-amber-400 to-transparent" />
             </div>
 
-            {/* E-Ashwa brand block */}
+            {/*   brand block */}
             <div className="flex flex-col items-center gap-4">
               <div className="w-20 h-20 rounded-2xl bg-white flex items-center justify-center shadow-lg shadow-gray-200">
-                <Image src={eashwa} width={100} height={100} className="object-contain rounded-md" alt="Chilwee Logo"/>
+                <Image src={ } width={100} height={100} className="object-contain rounded-md" alt="Chilwee Logo" />
               </div>
               <div>
-                <p className="font-extrabold text-gray-900 text-2xl tracking-tight">E-Ashwa</p>
+                <p className="font-extrabold text-gray-900 text-2xl tracking-tight"> </p>
                 <p className="text-gray-400 text-xs font-medium mt-0.5">Authorized Distributor — India</p>
               </div>
             </div>
@@ -418,11 +418,10 @@ export default function Home() {
             {products.map((p, i) => (
               <div
                 key={i}
-                className={`relative rounded-3xl p-8 border transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl ${
-                  p.featured
-                    ? "bg-gradient-to-br from-amber-500 to-amber-600 border-amber-400 shadow-2xl shadow-amber-200 text-white"
-                    : "bg-white border-gray-200 hover:border-amber-300 shadow-sm hover:shadow-amber-100"
-                }`}
+                className={`relative rounded-3xl p-8 border transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl ${p.featured
+                  ? "bg-gradient-to-br from-amber-500 to-amber-600 border-amber-400 shadow-2xl shadow-amber-200 text-white"
+                  : "bg-white border-gray-200 hover:border-amber-300 shadow-sm hover:shadow-amber-100"
+                  }`}
               >
                 {p.featured && (
                   <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gray-900 text-amber-400 text-xs font-bold px-4 py-1 rounded-full whitespace-nowrap">
@@ -591,9 +590,9 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
           <div className="sm:col-span-2 lg:col-span-1">
             <div className="flex items-center gap-2.5 mb-4">
-              <Image src={chiwee} width={50} height={50} className="object-contain rounded-md" alt="Chilwee Logo"/>
+              <Image src={chiwee} width={50} height={50} className="object-contain rounded-md" alt="Chilwee Logo" />
               <span className="text-gray-600 font-light">×</span>
-              <Image src={eashwa} width={50} height={50} className="object-contain rounded-md" alt="Chilwee Logo"/>
+              <Image src={ } width={50} height={50} className="object-contain rounded-md" alt="Chilwee Logo" />
             </div>
             <p className="text-white text-sm leading-relaxed mb-5">
               High-performance EV battery solutions for India's growing electric mobility ecosystem.
@@ -626,7 +625,7 @@ export default function Home() {
           <div>
             <p className="font-bold text-xs mb-5 text-gray-300 uppercase tracking-[0.2em]">Get In Touch</p>
             <ul className="space-y-3 text-sm text-white">
-              <li className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />ceo@eashwa.com</li>
+              <li className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />ceo@ .com</li>
               <li className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />+91 77238 66666</li>
               <li className="flex items-start gap-2">
                 <MapPin className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
@@ -637,7 +636,7 @@ export default function Home() {
         </div>
 
         <div className="border-t border-white/5 max-w-6xl mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white">
-          <p>© {new Date().getFullYear()} Chilwee × E-Ashwa. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Chilwee ×  . All rights reserved.</p>
           <div className="flex gap-5">
             <a href="#" className="hover:text-amber-400 transition-colors">Privacy Policy</a>
             <a href="#" className="hover:text-amber-400 transition-colors">Terms of Service</a>

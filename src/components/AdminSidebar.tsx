@@ -172,10 +172,10 @@ export function AdminSidebar() {
 
   const motionProps = isMobileView
     ? {
-        initial: { x: -300 },
-        animate: { x: open ? 0 : -300 },
-        transition: { type: "spring" as const, stiffness: 300, damping: 30 },
-      }
+      initial: { x: -300 },
+      animate: { x: open ? 0 : -300 },
+      transition: { type: "spring" as const, stiffness: 300, damping: 30 },
+    }
     : ({} as const);
 
   return (
@@ -228,7 +228,7 @@ export function AdminSidebar() {
             </div>
             <div>
               <h2 className="text-white font-bold text-lg leading-tight">
-                Eashwa
+
               </h2>
               <p className="text-orange-100 text-xs font-medium">
                 Live Tracking Admin
@@ -285,11 +285,10 @@ export function AdminSidebar() {
                   className="block relative group"
                 >
                   <motion.div
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
-                      isActive
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${isActive
                         ? "bg-orange-500 text-white shadow-md shadow-orange-200"
                         : "text-gray-600 hover:bg-orange-50 hover:text-orange-600"
-                    }`}
+                      }`}
                     whileHover={{ x: isActive ? 0 : 3 }}
                     whileTap={{ scale: 0.98 }}
                   >

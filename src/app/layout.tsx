@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Eashwa Live Tracking — Admin",
+  title: "  Live Tracking — Admin",
   description: "Field Employee Live Tracking & Management System",
 };
 

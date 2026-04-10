@@ -81,10 +81,11 @@ export async function registerEmployee(
 
 // ─── Employees ───────────────────────────────────────────────────────────────
 
-export async function getEmployees(token: string, search = "", dept = "") {
+export async function getEmployees(token: string, search = "", dept = "", page = 1) {
   const params = new URLSearchParams();
   if (search) params.set("search", search);
   if (dept) params.set("department", dept);
+  params.set("page", String(page));
   const res = await fetch(`${API_BASE}/users?${params}`, {
     headers: { Authorization: `Bearer ${token}` },
   });

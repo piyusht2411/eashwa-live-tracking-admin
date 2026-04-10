@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { Search, MapPin, TrendingUp, Eye, Phone, Plus, Loader2, Trash2, Edit } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Search, MapPin, TrendingUp, Eye, Plus, Loader2, Trash2, Edit, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import AddEmployeeModal from "@/components/AddEmployeeModal";
 import { useSelector } from "react-redux";
@@ -42,14 +42,22 @@ export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const token = useSelector((state: RootState) => state.auth.authToken);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchEmployees = async () => {
+  const fetchEmployees = async (currentPage: number, currentSearch: string) => {
     if (!token) return;
     try {
       setLoading(true);
-      const response = await getEmployees(token, "", "");
+      const response = await getEmployees(token, currentSearch, "", currentPage);
       setEmployees(response.data || []);
+      if (response.pagination) {
+        setTotalPages(response.pagination.pages);
+        setTotal(response.pagination.total);
+      }
     } catch {
       toast.error("Failed to load employees");
     } finally {
@@ -57,36 +65,36 @@ export default function EmployeesPage() {
     }
   };
 
+  // Fetch when page changes
   useEffect(() => {
-    fetchEmployees();
-  }, [token]);
+    fetchEmployees(page, search);
+  }, [page, token]);
 
-  // Client-side search: by employee name OR manager name
-  const filtered = useMemo(() => {
-    if (!search.trim()) return employees;
-    const q = search.toLowerCase();
-    return employees.filter(e => {
-      const nameMatch = e.name.toLowerCase().includes(q);
-      const managerMatch = e.managedBy?.name?.toLowerCase().includes(q);
-      return nameMatch || managerMatch;
-    });
-  }, [employees, search]);
+  // Debounce search — reset to page 1
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setPage(1);
+      fetchEmployees(1, search);
+    }, 400);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [search]);
 
   const scoreColor = (score: number) =>
     score >= 85 ? "text-green-600" : score >= 70 ? "text-orange-500" : "text-red-500";
 
-  // DELETE HANDLER
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Delete employee "${name}"? This action cannot be undone.`)) return;
-
     try {
       if (!token) {
         toast.error("Authentication token missing. Please login again.");
         return;
       }
       await deleteEmployee(token, id);
-      await fetchEmployees();
       toast.success(`Employee "${name}" deleted successfully`);
+      fetchEmployees(page, search);
     } catch {
       toast.error("Failed to delete employee");
     }
@@ -98,7 +106,7 @@ export default function EmployeesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black text-gray-800">Employees</h1>
-          <p className="text-sm text-gray-500">All field employees · {employees.length} total</p>
+          <p className="text-sm text-gray-500">All field employees · {total} total</p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
@@ -108,12 +116,12 @@ export default function EmployeesPage() {
         </button>
       </div>
 
-      <AddEmployeeModal open={showAddModal} onClose={() => setShowAddModal(false)} onSuccess={fetchEmployees} />
+      <AddEmployeeModal open={showAddModal} onClose={() => setShowAddModal(false)} onSuccess={() => fetchEmployees(page, search)} />
       <EditEmployeeModal
         open={!!editingId}
         employeeId={editingId!}
         onClose={() => setEditingId(null)}
-        onSuccess={fetchEmployees}           // ← NEW
+        onSuccess={() => fetchEmployees(page, search)}
       />
 
       {/* Search */}
@@ -122,7 +130,7 @@ export default function EmployeesPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by employee name or manager name…"
+            placeholder="Search by employee name…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none bg-white"
@@ -136,7 +144,7 @@ export default function EmployeesPage() {
           <Loader2 className="h-8 w-8 animate-spin text-orange-400 mb-3" />
           <p className="text-sm">Loading employees...</p>
         </div>
-      ) : filtered.length === 0 ? (
+      ) : employees.length === 0 ? (
         <div className="py-12 text-center text-gray-400">
           <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
           <p className="text-sm font-semibold text-gray-700">No employees found</p>
@@ -144,11 +152,11 @@ export default function EmployeesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map(emp => {
+          {employees.map((emp: Employee) => {
             const derivedStatus = emp.status || (emp.isActive ? "active" : "absent");
             const sc = statusConfig[derivedStatus] || statusConfig.active;
             const mockScore = emp.score || 85;
-            const initials = emp.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
+            const initials = emp.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
 
             return (
               <div
@@ -246,8 +254,64 @@ export default function EmployeesPage() {
         </div>
       )}
 
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-2">
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1 || loading}
+            className="p-2 rounded-xl border border-gray-200 hover:border-orange-300 hover:bg-orange-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft className="h-4 w-4 text-gray-600" />
+          </button>
+
+          {(() => {
+            const items: (number | "...")[] = [];
+            if (totalPages <= 7) {
+              for (let i = 1; i <= totalPages; i++) items.push(i);
+            } else {
+              items.push(1);
+              if (page > 3) items.push("...");
+              const start = Math.max(2, page - 1);
+              const end = Math.min(totalPages - 1, page + 1);
+              for (let i = start; i <= end; i++) items.push(i);
+              if (page < totalPages - 2) items.push("...");
+              items.push(totalPages);
+            }
+            return items.map((item, idx) =>
+              item === "..." ? (
+                <span key={`ellipsis-${idx}`} className="w-9 h-9 flex items-center justify-center text-sm text-gray-400 select-none">
+                  …
+                </span>
+              ) : (
+                <button
+                  key={item}
+                  onClick={() => setPage(item)}
+                  disabled={loading}
+                  className={`w-9 h-9 rounded-xl text-sm font-semibold transition-colors ${
+                    item === page
+                      ? "bg-orange-500 text-white shadow-sm shadow-orange-200"
+                      : "border border-gray-200 text-gray-600 hover:border-orange-300 hover:bg-orange-50"
+                  }`}
+                >
+                  {item}
+                </button>
+              )
+            );
+          })()}
+
+          <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages || loading}
+            className="p-2 rounded-xl border border-gray-200 hover:border-orange-300 hover:bg-orange-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronRight className="h-4 w-4 text-gray-600" />
+          </button>
+        </div>
+      )}
+
       <p className="text-xs text-gray-400 text-center">
-        Showing {filtered.length} of {employees.length} employees
+        Page {page} of {totalPages} · {total} employees total
       </p>
     </div>
   );

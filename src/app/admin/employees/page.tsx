@@ -6,7 +6,7 @@ import Link from "next/link";
 import AddEmployeeModal from "@/components/AddEmployeeModal";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
-import { getEmployees, deleteEmployee } from "@/lib/api";
+import { deleteEmployee, getMyTeamEmployees } from "@/lib/api";
 import { toast } from "sonner";
 import EditEmployeeModal from "@/components/EditEmployeeModal";
 
@@ -52,7 +52,7 @@ export default function EmployeesPage() {
     if (!token) return;
     try {
       setLoading(true);
-      const response = await getEmployees(token, currentSearch, "", currentPage);
+      const response = await getMyTeamEmployees(token, currentSearch, "", currentPage);
       setEmployees(response.data || []);
       if (response.pagination) {
         setTotalPages(response.pagination.pages);

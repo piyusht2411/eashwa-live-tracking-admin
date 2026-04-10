@@ -94,6 +94,19 @@ export async function getEmployees(token: string, search = "", dept = "", page =
   return data;
 }
 
+export async function getMyTeamEmployees(token: string, search = "", dept = "", page = 1) {
+  const params = new URLSearchParams();
+  if (search) params.set("search", search);
+  if (dept) params.set("department", dept);
+  params.set("page", String(page));
+  const res = await fetch(`${API_BASE}/users/my-team?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to fetch employees");
+  return data;
+}
+
 export async function getEmployeeById(token: string, id: string) {
   const res = await fetch(`${API_BASE}/users/${id}`, {
     headers: { Authorization: `Bearer ${token}` },

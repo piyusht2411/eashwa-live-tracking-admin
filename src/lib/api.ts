@@ -230,13 +230,61 @@ export async function createLeave(
   return data;
 }
 
-export async function getLeaveRequests(token: string) {
-  const res = await fetch(`${API_BASE}/leaves`, {
+export async function getLeaveRequests(
+  token: string,
+  params: { month?: number; year?: number; page?: number; limit?: number } = {}
+) {
+  const q = new URLSearchParams();
+  if (params.month) q.set("month", String(params.month));
+  if (params.year) q.set("year", String(params.year));
+  if (params.page) q.set("page", String(params.page));
+  if (params.limit) q.set("limit", String(params.limit));
+  const res = await fetch(`${API_BASE}/leaves?${q}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || "Failed to fetch leave requests");
-  return data;
+  return data as {
+    success: boolean;
+    data: LeaveRequestRaw[];
+    summary: LeaveSummary;
+    pagination: { total: number; page: number; pages: number; limit: number };
+  };
+}
+
+export interface LeaveRequestRaw {
+  _id: string;
+  user?: {
+    _id: string;
+    name: string;
+    role?: string;
+    employeeType?: string;
+    department?: string;
+    employeeId?: string;
+  };
+  type: string;
+  shortLeaveDuration?: number | null;
+  date: string;
+  startDate?: string;
+  endDate?: string;
+  reason?: string;
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+  updatedAt: string;
+  approvedBy?: { _id: string; name: string };
+}
+
+export interface LeaveSummary {
+  total: number;
+  totalPending: number;
+  totalApproved: number;
+  totalRejected: number;
+  casualTaken: number;
+  halfDayTaken: number;
+  shortLeaveHours: number;
+  shortLeavePendingHours: number;
+  shortLeaveAllowance: number;
+  shortLeaveRemaining: number;
 }
 
 export async function deleteLeave(token: string, leaveId: string) {
@@ -247,6 +295,26 @@ export async function deleteLeave(token: string, leaveId: string) {
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || "Failed to delete leave");
   return data;
+}
+
+export async function exportLeaves(
+  token: string,
+  params: { month?: number; year?: number } = {}
+) {
+  const q = new URLSearchParams();
+  if (params.month) q.set("month", String(params.month));
+  if (params.year) q.set("year", String(params.year));
+  const res = await fetch(`${API_BASE}/leaves/export?${q}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to export leaves");
+  return data as {
+    success: boolean;
+    data: LeaveRequestRaw[];
+    summary: LeaveSummary;
+    meta: { month: number; year: number; total: number };
+  };
 }
 
 export async function updateLeaveStatus(token: string, leaveId: string, status: "approved" | "rejected") {

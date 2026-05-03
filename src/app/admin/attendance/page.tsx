@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import { Calendar, CheckCircle2, XCircle, Clock, Download, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
-import { getAttendance } from "@/lib/api";
+import { getAttendance, exportAttendance } from "@/lib/api";
 import { toast } from "sonner";
 
 export interface AttendanceRecord {
@@ -64,6 +64,7 @@ export default function AttendancePage() {
   const [users, setUsers] = useState<UserOption[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
+  const [exportLoading, setExportLoading] = useState(false);
 
   const dateInputRef = useRef<HTMLInputElement>(null);
 
@@ -117,23 +118,44 @@ export default function AttendancePage() {
 
   const canGoNext = selectedDate < toDateString(new Date());
 
-  const exportToExcel = () => {
-    const rows = attendanceRecords.map((r) => ({
-      Employee: r.user?.name || "Unknown",
-      "Emp ID": r.user?.employeeId || "—",
-      Department: r.user?.department || "—",
-      Date: new Date(r.time).toLocaleDateString(),
-      Time: new Date(r.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      Type: r.type === "in" ? "Punch In" : "Punch Out",
-      "Auto Punch-Out": r.isAutomatic || r.selfie === null ? "Yes" : "No",
-      Status: r.isLate ? "Late" : "On Time",
-      Reason: r.reason || "—",
-    }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Attendance");
-    const suffix = filterMode === "day" ? selectedDate : `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
-    XLSX.writeFile(wb, `attendance_${suffix}.xlsx`);
+  const exportToExcel = async () => {
+    if (!token) return;
+    try {
+      setExportLoading(true);
+      const params: Record<string, string> = {};
+      if (filterMode === "day") {
+        params.date = selectedDate;
+      } else {
+        params.month = String(selectedMonth);
+        params.year = String(selectedYear);
+      }
+      if (selectedUserId) params.userId = selectedUserId;
+
+      const res = await exportAttendance(token, params);
+      const records: AttendanceRecord[] = res.data || [];
+
+      const rows = records.map((r) => ({
+        Employee: r.user?.name || "Unknown",
+        "Emp ID": r.user?.employeeId || "—",
+        Department: r.user?.department || "—",
+        Date: new Date(r.time).toLocaleDateString(),
+        Time: new Date(r.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        Type: r.type === "in" ? "Punch In" : "Punch Out",
+        "Auto Punch-Out": r.isAutomatic || r.selfie === null ? "Yes" : "No",
+        Status: r.isLate ? "Late" : "On Time",
+        Reason: r.reason || "—",
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+      const suffix = filterMode === "day" ? selectedDate : `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
+      XLSX.writeFile(wb, `attendance_${suffix}.xlsx`);
+      toast.success(`Exported ${records.length} records`);
+    } catch {
+      toast.error("Failed to export attendance");
+    } finally {
+      setExportLoading(false);
+    }
   };
 
   const stats = {
@@ -163,9 +185,15 @@ export default function AttendancePage() {
         </div>
         <button
           onClick={exportToExcel}
-          className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-xl font-semibold text-sm hover:bg-orange-600 transition-colors"
+          disabled={exportLoading}
+          className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-xl font-semibold text-sm hover:bg-orange-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          <Download className="h-4 w-4" /> Export Excel
+          {exportLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
+          {exportLoading ? "Exporting..." : "Export Excel"}
         </button>
       </div>
 

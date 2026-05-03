@@ -315,8 +315,21 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
       r.distance ?? "—",
       r.timeSpent ?? "—",
     ]);
-    const csv = [headers, ...rows].map(row => row.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
+
+    const escapeCell = (val: unknown): string => {
+      const str = String(val ?? "");
+      // Wrap in quotes if the value contains a comma, quote, or newline
+      if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const csv = [headers, ...rows]
+      .map(row => row.map(escapeCell).join(","))
+      .join("\n");
+
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

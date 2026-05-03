@@ -207,6 +207,22 @@ export async function getAttendance(token: string, params: Record<string, string
   return data;
 }
 
+export async function exportAttendance(token: string, params: Record<string, string> = {}) {
+  const qs = new URLSearchParams(params).toString();
+  const url = `${API_BASE}/attendance/export${qs ? `?${qs}` : ""}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to export attendance");
+  return data as {
+    success: boolean;
+    data: import("@/app/admin/attendance/page").AttendanceRecord[];
+    total: number;
+    filters: Record<string, string>;
+  };
+}
+
 export async function createLeave(
   token: string,
   payload: {

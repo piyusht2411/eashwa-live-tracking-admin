@@ -639,8 +639,8 @@ export default function Home() {
         <div className="border-t border-white/5 max-w-6xl mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white">
           <p>© {new Date().getFullYear()} Chilwee × E-Ashwa. All rights reserved.</p>
           <div className="flex gap-5">
-            <a href="#" className="hover:text-amber-400 transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-amber-400 transition-colors">Terms of Service</a>
+            <a href="/privacy-policy" className="hover:text-amber-400 transition-colors">Privacy Policy</a>
+            {/* <a href="#" className="hover:text-amber-400 transition-colors">Terms of Service</a> */}
           </div>
         </div>
       </footer>

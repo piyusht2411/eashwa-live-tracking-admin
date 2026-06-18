@@ -234,7 +234,7 @@ const contactInfo = [
   {
     icon: MapPin,
     label: "Address",
-    value: "India Operations · Authorized Distributor",
+    value: "H-133, First Floor, H Block, Sector 63, Noida, Uttar Pradesh 201309",
     href: null,
   },
 ];
@@ -559,17 +559,6 @@ export default function PrivacyPolicy() {
                 </section>
               );
             })}
-
-            {/* Update notice */}
-            <div className="update-banner mt-6">
-              <span style={{ fontWeight: 600, color: "#1f2937" }}>
-                Policy Updates:{" "}
-              </span>
-              We may update this Privacy Policy periodically. We will notify you
-              of material changes via email or by posting a prominent notice on
-              our platform. Your continued use of our services constitutes
-              acceptance of the updated policy.
-            </div>
 
             <div className="mt-6">
               <a

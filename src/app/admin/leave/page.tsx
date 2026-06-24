@@ -40,6 +40,31 @@ const leaveTypeLabel: Record<string, string> = {
   half_day: "Half Day",
 };
 
+/** Inclusive leave-day count excluding Sundays (office working days are Mon–Sat). */
+function countLeaveDays(start: string, end?: string | null): number {
+  const s = new Date(start);
+  const e = end ? new Date(end) : new Date(start);
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) return 1;
+  s.setHours(0, 0, 0, 0);
+  e.setHours(0, 0, 0, 0);
+  if (e < s) return 1;
+  let count = 0;
+  const cur = new Date(s);
+  while (cur <= e) {
+    if (cur.getDay() !== 0) count++; // 0 = Sunday → skipped
+    cur.setDate(cur.getDate() + 1);
+  }
+  return Math.max(count, 1);
+}
+
+/** Formats a leave date as a single day, or a range with working-day count. */
+function formatLeaveDateRange(date: string, endDate?: string | null): string {
+  const fmt = (d: string) =>
+    new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  if (!endDate || endDate === date) return fmt(date);
+  return `${fmt(date)} → ${fmt(endDate)} (${countLeaveDays(date, endDate)} days)`;
+}
+
 export default function LeavePage() {
   const now = new Date();
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequestRaw[]>([]);
@@ -131,6 +156,11 @@ export default function LeavePage() {
         "Leave Type": req.type,
         "Short Leave (hrs)": req.shortLeaveDuration ?? "",
         Date: req.date ? new Date(req.date).toLocaleDateString("en-IN") : "",
+        "End Date":
+          req.endDate && req.endDate !== req.date
+            ? new Date(req.endDate).toLocaleDateString("en-IN")
+            : "",
+        Days: req.date ? countLeaveDays(req.date, req.endDate) : "",
         Reason: req.reason || "",
         Status: req.status,
         "Approved/Rejected By": req.approvedBy?.name || "",
@@ -161,11 +191,21 @@ export default function LeavePage() {
         );
       }
 
-      // Column widths
+      // Column widths (order matches the row keys above)
       ws["!cols"] = [
-        { wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
-        { wch: 12 }, { wch: 18 }, { wch: 14 }, { wch: 50 },
-        { wch: 10 }, { wch: 22 }, { wch: 14 },
+        { wch: 22 }, // Employee Name
+        { wch: 14 }, // Employee ID
+        { wch: 14 }, // Department
+        { wch: 14 }, // Employee Type
+        { wch: 12 }, // Leave Type
+        { wch: 18 }, // Short Leave (hrs)
+        { wch: 14 }, // Date
+        { wch: 14 }, // End Date
+        { wch: 8 },  // Days
+        { wch: 50 }, // Reason
+        { wch: 10 }, // Status
+        { wch: 22 }, // Approved/Rejected By
+        { wch: 14 }, // Applied On
       ];
 
       const wb = XLSX.utils.book_new();
@@ -345,11 +385,7 @@ export default function LeavePage() {
               const dept = req.user?.department || "";
               const empType = req.user?.employeeType || "";
               const dateStr = req.date
-                ? new Date(req.date).toLocaleDateString("en-IN", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })
+                ? formatLeaveDateRange(req.date, req.endDate)
                 : "—";
               const typeLabel = leaveTypeLabel[req.type] || req.type;
               const shortDur = req.shortLeaveDuration

@@ -26,6 +26,16 @@ export interface AttendanceRecord {
   isLate?: boolean;
 }
 
+/** One employee-day row returned when groupByDay=true. */
+interface GroupedAttendanceDay {
+  _id: string;
+  user?: { _id: string; name: string; employeeId: string; department: string };
+  date: string;
+  punchIn: { time: string; isLate?: boolean; selfie?: string | null } | null;
+  punchOut: { time: string; isAutomatic?: boolean; selfie?: string | null; reason?: string | null } | null;
+  totalHours: string;
+}
+
 interface UserOption { _id: string; name: string; employeeId: string; }
 interface Pagination {
   totalRecords: number;
@@ -48,6 +58,47 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
+// Earliest plausible punch timestamp — guards against epoch/garbage values that
+// would otherwise produce an absurd total (same guard as the mobile app).
+const MIN_VALID_TS = new Date("2020-01-01T00:00:00Z").getTime();
+const MAX_SESSION_MS = 24 * 60 * 60 * 1000;
+
+/** Worked hours between a day's punch-in and punch-out, e.g. "8h 12m". */
+function calcTotalHours(inISO?: string, outISO?: string): string {
+  if (!inISO || !outISO) return "—";
+  const inMs = new Date(inISO).getTime();
+  const outMs = new Date(outISO).getTime();
+  if (!Number.isFinite(inMs) || !Number.isFinite(outMs)) return "—";
+  if (inMs < MIN_VALID_TS) return "—";
+  const diff = outMs - inMs;
+  if (diff < 0 || diff > MAX_SESSION_MS) return "—";
+  const mins = Math.floor(diff / 60000);
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+}
+
+/** Groups punch events by employee + calendar day → earliest in / latest out. */
+function buildDayPairs(records: AttendanceRecord[]): Map<string, { in?: string; out?: string }> {
+  const pairs = new Map<string, { in?: string; out?: string }>();
+  for (const r of records) {
+    const d = new Date(r.time);
+    const key = `${r.user?._id ?? "?"}_${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    const entry = pairs.get(key) ?? {};
+    if (r.type === "in") {
+      if (!entry.in || new Date(r.time) < new Date(entry.in)) entry.in = r.time;
+    } else {
+      if (!entry.out || new Date(r.time) > new Date(entry.out)) entry.out = r.time;
+    }
+    pairs.set(key, entry);
+  }
+  return pairs;
+}
+
+/** Returns the pairing key for a single record (must match buildDayPairs). */
+function dayPairKey(r: AttendanceRecord): string {
+  const d = new Date(r.time);
+  return `${r.user?._id ?? "?"}_${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
 export default function AttendancePage() {
   const token = useSelector((state: RootState) => state.auth.authToken);
 
@@ -59,8 +110,8 @@ export default function AttendancePage() {
   const [selectedUserId, setSelectedUserId] = useState("");
   const [page, setPage] = useState(1);
 
-  // Data state
-  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  // Data state — day-grouped rows (one per employee per day, with total hours)
+  const [attendanceRecords, setAttendanceRecords] = useState<GroupedAttendanceDay[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,7 +123,7 @@ export default function AttendancePage() {
     if (!token) return;
     try {
       setLoading(true);
-      const params: Record<string, string> = { page: String(page), limit: "20" };
+      const params: Record<string, string> = { page: String(page), limit: "20", groupByDay: "true" };
       if (filterMode === "day") {
         params.date = selectedDate;
       } else {
@@ -134,6 +185,7 @@ export default function AttendancePage() {
       const res = await exportAttendance(token, params);
       const records: AttendanceRecord[] = res.data || [];
 
+      const exportPairs = buildDayPairs(records);
       const rows = records.map((r) => ({
         Employee: r.user?.name || "Unknown",
         "Emp ID": r.user?.employeeId || "—",
@@ -141,6 +193,9 @@ export default function AttendancePage() {
         Date: new Date(r.time).toLocaleDateString(),
         Time: new Date(r.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         Type: r.type === "in" ? "Punch In" : "Punch Out",
+        Total: r.type === "out"
+          ? calcTotalHours(exportPairs.get(dayPairKey(r))?.in, exportPairs.get(dayPairKey(r))?.out)
+          : "—",
         "Auto Punch-Out": r.isAutomatic || r.selfie === null ? "Yes" : "No",
         Status: r.isLate ? "Late" : "On Time",
         Reason: r.reason || "—",
@@ -160,8 +215,8 @@ export default function AttendancePage() {
 
   const stats = {
     records: pagination?.totalRecords ?? attendanceRecords.length,
-    punchesIn: attendanceRecords.filter(r => r.type === "in").length,
-    punchesOut: attendanceRecords.filter(r => r.type === "out").length,
+    punchesIn: attendanceRecords.filter(r => r.punchIn).length,
+    punchesOut: attendanceRecords.filter(r => r.punchOut).length,
     employeesTracked: new Set(attendanceRecords.map(r => r.user?._id).filter(Boolean)).size,
   };
 
@@ -200,9 +255,9 @@ export default function AttendancePage() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Total Punches", value: stats.records, color: "bg-blue-50 border-blue-100 text-blue-600" },
-          { label: "Punch Ins", value: stats.punchesIn, color: "bg-green-50 border-green-100 text-green-600" },
-          { label: "Punch Outs", value: stats.punchesOut, color: "bg-orange-50 border-orange-100 text-orange-600" },
+          { label: "Records (days)", value: stats.records, color: "bg-blue-50 border-blue-100 text-blue-600" },
+          { label: "Punched In", value: stats.punchesIn, color: "bg-green-50 border-green-100 text-green-600" },
+          { label: "Punched Out", value: stats.punchesOut, color: "bg-orange-50 border-orange-100 text-orange-600" },
           { label: "Staff Recorded", value: stats.employeesTracked, color: "bg-purple-50 border-purple-100 text-purple-500" },
         ].map(s => (
           <div key={s.label} className={`rounded-2xl border p-4 ${s.color}`}>
@@ -300,7 +355,7 @@ export default function AttendancePage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/50">
-                {["Employee", "Emp ID", "Date", "Time", "Type", "Selfie", "Status"].map(h => (
+                {["Employee", "Emp ID", "Date", "Punch In", "Punch Out", "Total", "Status"].map(h => (
                   <th key={h} className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">{h}</th>
                 ))}
               </tr>
@@ -322,10 +377,11 @@ export default function AttendancePage() {
               ) : (
                 attendanceRecords.map((row) => {
                   const uName = row.user?.name || "Unknown";
-                  const formatTime = new Date(row.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-                  const formatDate = new Date(row.time).toLocaleDateString();
-                  const isPunchIn = row.type === "in";
-                  const isAuto = row.isAutomatic || row.selfie === null;
+                  const fmtTime = (t?: string | null) =>
+                    t ? new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—";
+                  const dateStr = new Date(row.date).toLocaleDateString();
+                  const isLate = row.punchIn?.isLate ?? false;
+                  const isAuto = row.punchOut?.isAutomatic ?? false;
 
                   return (
                     <tr key={row._id} className={`border-b border-gray-50 hover:bg-orange-50/20 transition-colors ${isAuto ? "bg-red-50/30" : ""}`}>
@@ -338,38 +394,43 @@ export default function AttendancePage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500">{row.user?.employeeId || "—"}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{formatDate}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700 font-medium">{formatTime}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{dateStr}</td>
+                      {/* Punch In */}
                       <td className="px-4 py-3">
-                        <div className="flex flex-col gap-1">
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full w-fit ${isPunchIn ? "bg-green-100 text-green-600" : "bg-orange-100 text-orange-600"}`}>
-                            {isPunchIn ? "Punch In" : "Punch Out"}
-                          </span>
-                          {isAuto && (
-                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full w-fit bg-red-100 text-red-600">
-                              Auto Punch-Out
-                            </span>
+                        <div className="flex items-center gap-2">
+                          {row.punchIn?.selfie ? (
+                            <img src={row.punchIn.selfie} alt="In" className="w-7 h-7 rounded-full object-cover border border-gray-200" />
+                          ) : null}
+                          <span className="text-sm font-medium text-gray-700">{fmtTime(row.punchIn?.time)}</span>
+                          {isLate && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">Late</span>
                           )}
                         </div>
                       </td>
+                      {/* Punch Out */}
                       <td className="px-4 py-3">
-                        {isAuto ? (
-                          <span className="text-xs text-red-500 font-medium">{row.reason || "Location sharing stopped"}</span>
-                        ) : row.selfie ? (
-                          <img src={row.selfie} alt="Selfie" className="w-8 h-8 rounded-full object-cover border border-gray-200" />
-                        ) : (
-                          <span className="text-xs text-gray-400">—</span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {row.punchOut?.selfie ? (
+                            <img src={row.punchOut.selfie} alt="Out" className="w-7 h-7 rounded-full object-cover border border-gray-200" />
+                          ) : null}
+                          <span className="text-sm font-medium text-gray-700">{fmtTime(row.punchOut?.time)}</span>
+                          {isAuto && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600">Auto</span>
+                          )}
+                        </div>
                       </td>
+                      {/* Total */}
+                      <td className="px-4 py-3 text-sm font-bold text-gray-800">{row.totalHours}</td>
+                      {/* Status */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
-                          {row.isLate ? (
+                          {isLate ? (
                             <XCircle className="h-3.5 w-3.5 text-red-500" />
                           ) : (
                             <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
                           )}
-                          <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${row.isLate ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
-                            {row.isLate ? "Late" : "On Time"}
+                          <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${isLate ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+                            {isLate ? "Late" : "On Time"}
                           </span>
                         </div>
                       </td>

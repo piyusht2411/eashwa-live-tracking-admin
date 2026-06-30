@@ -34,6 +34,8 @@ interface GroupedAttendanceDay {
   punchIn: { time: string; isLate?: boolean; selfie?: string | null } | null;
   punchOut: { time: string; isAutomatic?: boolean; selfie?: string | null; reason?: string | null } | null;
   totalHours: string;
+  /** true when the in/out pair is logically impossible (out before in, or out with no in) */
+  anomaly?: boolean;
 }
 
 interface UserOption { _id: string; name: string; employeeId: string; }
@@ -382,9 +384,10 @@ export default function AttendancePage() {
                   const dateStr = new Date(row.date).toLocaleDateString();
                   const isLate = row.punchIn?.isLate ?? false;
                   const isAuto = row.punchOut?.isAutomatic ?? false;
+                  const isAnomaly = row.anomaly ?? false;
 
                   return (
-                    <tr key={row._id} className={`border-b border-gray-50 hover:bg-orange-50/20 transition-colors ${isAuto ? "bg-red-50/30" : ""}`}>
+                    <tr key={row._id} className={`border-b border-gray-50 hover:bg-orange-50/20 transition-colors ${isAnomaly ? "bg-amber-50/60" : isAuto ? "bg-red-50/30" : ""}`}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
                           <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 font-bold text-xs flex items-center justify-center flex-shrink-0 uppercase">
@@ -424,14 +427,28 @@ export default function AttendancePage() {
                       {/* Status */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
-                          {isLate ? (
-                            <XCircle className="h-3.5 w-3.5 text-red-500" />
+                          {isAnomaly ? (
+                            <>
+                              <XCircle className="h-3.5 w-3.5 text-amber-600" />
+                              <span
+                                className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700"
+                                title="Punch-out before punch-in (or punch-out with no punch-in) — needs review"
+                              >
+                                Anomaly
+                              </span>
+                            </>
                           ) : (
-                            <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                            <>
+                              {isLate ? (
+                                <XCircle className="h-3.5 w-3.5 text-red-500" />
+                              ) : (
+                                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                              )}
+                              <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${isLate ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+                                {isLate ? "Late" : "On Time"}
+                              </span>
+                            </>
                           )}
-                          <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${isLate ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
-                            {isLate ? "Late" : "On Time"}
-                          </span>
                         </div>
                       </td>
                     </tr>
